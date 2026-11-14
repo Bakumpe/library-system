@@ -40,7 +40,7 @@ if (!in_array($requestMethod, ['GET', 'POST'], true)) {
     $member = $stmt->fetch();
 
     if (!$member) {
-        http_response_code(404);
+    
         $errors[] = 'That member could not be found.';
     } else {
         $memberNumber = $member['member_number'];
