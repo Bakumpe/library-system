@@ -39,18 +39,54 @@ function redirect(string $path): never
     exit;
 }
 
-/** Queue a message for the next page. $type is 'success' or 'error'. */
+/**
+ * Queue a toast for the next page, after a redirect.
+ * $type is 'success', 'error' or 'info'.
+ */
 function flash(string $type, string $message): void
 {
     $_SESSION['flash'][] = ['type' => $type, 'message' => $message];
 }
 
-/** Return the queued messages and clear them. header.php prints these. */
+/** Show a toast on this page, without a redirect. Use it for form errors. */
+function flash_now(string $type, string $message): void
+{
+    pending_flashes(['type' => $type, 'message' => $message]);
+}
+
+/** The toasts added with flash_now() during this request. */
+function pending_flashes(?array $add = null): array
+{
+    static $list = [];
+    if ($add !== null) {
+        $list[] = $add;
+    }
+    return $list;
+}
+
+/** Return the queued toasts and clear them. header.php prints these. */
 function take_flashes(): array
 {
-    $messages = $_SESSION['flash'] ?? [];
+    $messages = array_merge($_SESSION['flash'] ?? [], pending_flashes());
     unset($_SESSION['flash']);
     return $messages;
+}
+
+/**
+ * Print a form field's error under it. Pair it with field_attrs() on the input.
+ * $errors is keyed by field name.
+ */
+function field_error(array $errors, string $name): string
+{
+    return isset($errors[$name])
+        ? '<p class="field__error" id="' . e($name) . '-error">' . e($errors[$name]) . '</p>'
+        : '';
+}
+
+/** aria-invalid and aria-describedby for an input that has an error. */
+function field_attrs(array $errors, string $name): string
+{
+    return isset($errors[$name]) ? ' aria-invalid="true" aria-describedby="' . e($name) . '-error"' : '';
 }
 
 function csrf_token(): string
@@ -99,6 +135,49 @@ function validate_email(string $value, string $label = 'Email'): ?string
     return filter_var($value, FILTER_VALIDATE_EMAIL) === false
         ? "$label is not a valid email address."
         : null;
+}
+
+/** Return an error message when a username is not 3 to 40 lowercase letters, digits, dots, dashes or underscores. */
+function validate_username(string $value): ?string
+{
+    if ($value === '') {
+        return 'Username is required.';
+    }
+    return preg_match('/^[a-z0-9._-]{3,40}$/', $value) === 1
+        ? null
+        : 'Username must be 3 to 40 letters, numbers, dots, dashes or underscores, with no spaces.';
+}
+
+/** Return an error message when a new password is too short, too long or not confirmed, otherwise null. */
+function validate_new_password(string $password, string $confirm): ?string
+{
+    if (strlen($password) < 8) {
+        return 'Password must be at least 8 characters.';
+    }
+    // password_hash() only uses the first 72 bytes.
+    if (strlen($password) > 72) {
+        return 'Password must be 72 characters or fewer.';
+    }
+    if ($password !== $confirm) {
+        return 'The two passwords do not match.';
+    }
+    return null;
+}
+
+/** Read a password field from POST exactly as typed (no trimming). */
+function post_password(string $name): string
+{
+    $value = $_POST[$name] ?? '';
+    return is_string($value) ? $value : '';
+}
+
+/** Start a fresh session for a user row that has user_id, full_name and role. */
+function log_in(array $account): void
+{
+    session_regenerate_id(true);
+    $_SESSION['user_id']   = (int) $account['user_id'];
+    $_SESSION['full_name'] = $account['full_name'];
+    $_SESSION['role']      = $account['role'];
 }
 
 /** True when a PDOException came from a UNIQUE constraint. */
