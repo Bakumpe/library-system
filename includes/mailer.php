@@ -55,15 +55,16 @@ const CODE_RESEND_SECONDS = 60;
 /**
  * Make a new 6-digit code for a user, store its hash and email it.
  * $purpose is 'verify' (confirm the email) or 'reset' (forgotten password).
- * Returns null when it worked, otherwise a message to show.
- * On local, when no email could be sent, the code is shown in a flash message instead.
+ * Returns the toast to show: ['type' => 'success'|'info'|'error', 'message' => ...].
+ * 'error' means no code reached the user. On local, when the email cannot be sent,
+ * the code itself is shown ('info') so you can keep testing without email.
  */
-function send_code(PDO $pdo, array $user, string $purpose): ?string
+function send_code(PDO $pdo, array $user, string $purpose): array
 {
     $stmt = $pdo->prepare('SELECT code_sent_at > NOW() - INTERVAL ? SECOND FROM users WHERE user_id = ? AND code_purpose = ?');
     $stmt->execute([CODE_RESEND_SECONDS, $user['user_id'], $purpose]);
     if ((int) $stmt->fetchColumn() === 1) {
-        return 'A code was sent less than a minute ago. Check your inbox and spam folder, or wait a moment.';
+        return ['type' => 'error', 'message' => 'A code was sent less than a minute ago. Check your inbox and spam folder, or wait a moment.'];
     }
 
     $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -76,13 +77,12 @@ function send_code(PDO $pdo, array $user, string $purpose): ?string
 
     $email = code_email($purpose, $user['full_name'], $code);
     if (send_mail($user['email'], $email['subject'], $email['html'], $email['text'])) {
-        return null;
+        return ['type' => 'success', 'message' => "We emailed a 6-digit code to {$user['email']}."];
     }
     if (app_config()['env'] === 'local') {
-        flash('success', "Local mode: no email was sent. The code for {$user['email']} is $code.");
-        return null;
+        return ['type' => 'info', 'message' => "Local mode: the email to {$user['email']} was not sent, so here is the code: $code."];
     }
-    return 'We could not send the email. Try again in a few minutes.';
+    return ['type' => 'error', 'message' => 'We could not send the email. Try again in a few minutes.'];
 }
 
 /**

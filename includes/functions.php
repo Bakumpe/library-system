@@ -39,18 +39,54 @@ function redirect(string $path): never
     exit;
 }
 
-/** Queue a message for the next page. $type is 'success' or 'error'. */
+/**
+ * Queue a toast for the next page, after a redirect.
+ * $type is 'success', 'error' or 'info'.
+ */
 function flash(string $type, string $message): void
 {
     $_SESSION['flash'][] = ['type' => $type, 'message' => $message];
 }
 
-/** Return the queued messages and clear them. header.php prints these. */
+/** Show a toast on this page, without a redirect. Use it for form errors. */
+function flash_now(string $type, string $message): void
+{
+    pending_flashes(['type' => $type, 'message' => $message]);
+}
+
+/** The toasts added with flash_now() during this request. */
+function pending_flashes(?array $add = null): array
+{
+    static $list = [];
+    if ($add !== null) {
+        $list[] = $add;
+    }
+    return $list;
+}
+
+/** Return the queued toasts and clear them. header.php prints these. */
 function take_flashes(): array
 {
-    $messages = $_SESSION['flash'] ?? [];
+    $messages = array_merge($_SESSION['flash'] ?? [], pending_flashes());
     unset($_SESSION['flash']);
     return $messages;
+}
+
+/**
+ * Print a form field's error under it. Pair it with field_attrs() on the input.
+ * $errors is keyed by field name.
+ */
+function field_error(array $errors, string $name): string
+{
+    return isset($errors[$name])
+        ? '<p class="field__error" id="' . e($name) . '-error">' . e($errors[$name]) . '</p>'
+        : '';
+}
+
+/** aria-invalid and aria-describedby for an input that has an error. */
+function field_attrs(array $errors, string $name): string
+{
+    return isset($errors[$name]) ? ' aria-invalid="true" aria-describedby="' . e($name) . '-error"' : '';
 }
 
 function csrf_token(): string
@@ -104,9 +140,12 @@ function validate_email(string $value, string $label = 'Email'): ?string
 /** Return an error message when a username is not 3 to 40 lowercase letters, digits, dots, dashes or underscores. */
 function validate_username(string $value): ?string
 {
+    if ($value === '') {
+        return 'Username is required.';
+    }
     return preg_match('/^[a-z0-9._-]{3,40}$/', $value) === 1
         ? null
-        : 'Username must be 3 to 40 characters: lowercase letters, numbers, dots, dashes or underscores.';
+        : 'Username must be 3 to 40 letters, numbers, dots, dashes or underscores, with no spaces.';
 }
 
 /** Return an error message when a new password is too short, too long or not confirmed, otherwise null. */
