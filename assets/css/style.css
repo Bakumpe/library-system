@@ -115,7 +115,7 @@ a { color: inherit; }
   color: var(--lamp-ink);
   font-weight: 700;
 }
-.stacks__user { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 0 auto; font-size: 0.875rem; }
+.stacks__user { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0 0 0 auto; font-size: 0.875rem; }
 
 /* Page */
 .page {
@@ -229,6 +229,7 @@ tbody tr:hover { background: rgba(214, 165, 76, 0.08); }
 }
 .slip__title { margin: 0; font-size: 3rem; }
 .slip__sub { margin: 0 0 1.25rem; font-family: var(--typed); color: var(--ink-soft); }
+.slip__foot { margin: 1rem 0 0; font-size: 0.875rem; color: var(--ink-soft); }
 
 /* Dashboard */
 .tally {

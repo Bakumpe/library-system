@@ -101,6 +101,46 @@ function validate_email(string $value, string $label = 'Email'): ?string
         : null;
 }
 
+/** Return an error message when a username is not 3 to 40 lowercase letters, digits, dots, dashes or underscores. */
+function validate_username(string $value): ?string
+{
+    return preg_match('/^[a-z0-9._-]{3,40}$/', $value) === 1
+        ? null
+        : 'Username must be 3 to 40 characters: lowercase letters, numbers, dots, dashes or underscores.';
+}
+
+/** Return an error message when a new password is too short, too long or not confirmed, otherwise null. */
+function validate_new_password(string $password, string $confirm): ?string
+{
+    if (strlen($password) < 8) {
+        return 'Password must be at least 8 characters.';
+    }
+    // password_hash() only uses the first 72 bytes.
+    if (strlen($password) > 72) {
+        return 'Password must be 72 characters or fewer.';
+    }
+    if ($password !== $confirm) {
+        return 'The two passwords do not match.';
+    }
+    return null;
+}
+
+/** Read a password field from POST exactly as typed (no trimming). */
+function post_password(string $name): string
+{
+    $value = $_POST[$name] ?? '';
+    return is_string($value) ? $value : '';
+}
+
+/** Start a fresh session for a user row that has user_id, full_name and role. */
+function log_in(array $account): void
+{
+    session_regenerate_id(true);
+    $_SESSION['user_id']   = (int) $account['user_id'];
+    $_SESSION['full_name'] = $account['full_name'];
+    $_SESSION['role']      = $account['role'];
+}
+
 /** True when a PDOException came from a UNIQUE constraint. */
 function is_duplicate_error(PDOException $e): bool
 {
