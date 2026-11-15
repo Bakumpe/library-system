@@ -9,10 +9,7 @@ A web system that lets librarians manage books, members and loans from a browser
 After setting up once (Windows or Mac steps below), these are the only commands you need. Run them from the project folder, in Git Bash on Windows or Terminal on a Mac.
 
 ```sh
-php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-php -r "if (hash_file('sha384', 'composer-setup.php') === 'c8b085408188070d5f52bcfe4ecfbee5f727afa458b2573b8eaaf77b3419b0bf2768dc67c86944da1544f06fa544fd47') { echo 'Installer verified'.PHP_EOL; } else { echo 'Installer corrupt'.PHP_EOL; unlink('composer-setup.php'); exit(1); }"
-php composer-setup.php
-php -r "unlink('composer-setup.php');"     # what's installed, running or missing, with a fix for each
+composer dev:doctor     # what's installed, running or missing, with a fix for each
 composer dev:start      # start Apache and MySQL, print the app link
 composer dev:seed       # create library_db with the sample data
 composer code:check     # run the checks before you push
@@ -61,7 +58,7 @@ git clone <repository-url> library-system
 
 Without Git, download the ZIP from GitHub and extract it so the folder is `C:\xampp\htdocs\library-system`, with `index.php` directly inside it.
 
-**4. Create the database.** Open <>.
+**4. Create the database.** Open <http://localhost/phpmyadmin>.
 
 1. Click **New**, enter `library_db`, choose the collation `utf8mb4_general_ci`, and click **Create**.
 2. Select `library_db`, open the **Import** tab, choose `database/library_db.sql` from the project, and click **Import**.
