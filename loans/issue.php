@@ -112,17 +112,18 @@ $books = $pdo->query(
 )->fetchAll();
 $due_date = $pdo->query('SELECT DATE_ADD(CURDATE(), INTERVAL 14 DAY)')->fetchColumn();
 
+if ($error !== null) {
+    flash_now('error', $error);
+}
+
 $page_title = 'Issue a book';
 require __DIR__ . '/../includes/header.php';
 ?>
 <h1>Issue a book</h1>
 <p>Loans issued today are due on <strong><?= e($due_date) ?></strong> (14 days after issue).</p>
 
-<?php if ($error !== null) : ?>
-    <p class="flash flash--error" role="alert"><?= e($error) ?></p>
-<?php endif; ?>
 
-<form method="post" class="form">
+<form method="post" class="form" data-busy-form>
     <?= csrf_field() ?>
     <label for="member_id">Member</label>
     <select id="member_id" name="member_id" required>
@@ -148,7 +149,7 @@ require __DIR__ . '/../includes/header.php';
         <?php endforeach; ?>
     </select>
 
-    <button class="btn" type="submit">Issue book</button>
+    <button class="btn" type="submit" data-busy-label="Issuing…">Issue book</button>
 </form>
 <p><a href="<?= e(url('loans/index.php')) ?>">Back to loans</a></p>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

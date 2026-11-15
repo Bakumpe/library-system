@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/reports.php';
 
 $search = trim((string) ($_GET['q'] ?? ''));
 $author_id = (int) ($_GET['author_id'] ?? 0);
@@ -10,19 +11,31 @@ $authors = author_choices($pdo);
 $categories = category_choices($pdo);
 
 // Each filter is skipped when it is empty (0 or ''), so one query covers every combination.
-$stmt = $pdo->prepare(
-    'SELECT b.book_id, b.isbn, b.title, b.publisher, b.year_published, b.total_copies, b.available_copies,
-            a.name AS author_name, c.name AS category_name
-     FROM books b
-     JOIN authors a ON a.author_id = b.author_id
-     JOIN categories c ON c.category_id = b.category_id
-     WHERE (? = \'\' OR b.title LIKE ?)
-       AND (? = 0 OR b.author_id = ?)
-       AND (? = 0 OR b.category_id = ?)
-     ORDER BY b.title'
-);
-$stmt->execute([$search, '%' . $search . '%', $author_id, $author_id, $category_id, $category_id]);
-$books = $stmt->fetchAll();
+$from = ' FROM books b
+          JOIN authors a ON a.author_id = b.author_id
+          JOIN categories c ON c.category_id = b.category_id
+          WHERE (? = \'\' OR b.title LIKE ?)
+            AND (? = 0 OR b.author_id = ?)
+            AND (? = 0 OR b.category_id = ?)';
+$params = [$search, '%' . $search . '%', $author_id, $author_id, $category_id, $category_id];
+$select = 'SELECT b.book_id, b.isbn, b.title, b.publisher, b.year_published, b.total_copies, b.available_copies,
+                  a.name AS author_name, c.name AS category_name' . $from . ' ORDER BY b.title';
+
+if (wants_csv()) {
+    $stmt = $pdo->prepare($select); // $select holds only ? placeholders.
+    $stmt->execute($params);
+    $rows = [];
+    foreach ($stmt as $book) {
+        $rows[] = [
+            $book['title'], $book['author_name'], $book['category_name'], $book['isbn'], $book['publisher'],
+            $book['year_published'], $book['total_copies'], $book['available_copies'],
+        ];
+    }
+    send_csv('books', ['Title', 'Author', 'Category', 'ISBN', 'Publisher', 'Year', 'Total copies', 'On shelf'], $rows);
+}
+
+$pages = paginate(count_rows($pdo, $from, $params));
+$books = fetch_page($pdo, $select, $params, $pages);
 
 $filtered = $search !== '' || $author_id > 0 || $category_id > 0;
 
@@ -55,7 +68,12 @@ require __DIR__ . '/../includes/header.php';
     </div>
 </form>
 
-<p><?= count($books) ?> <?= count($books) === 1 ? 'book' : 'books' ?><?= $filtered ? ' match' . (count($books) === 1 ? 'es' : '') . ' these filters' : ' in the catalogue' ?>.</p>
+<div class="list-head">
+    <p><?= $pages['total'] ?> <?= $pages['total'] === 1 ? 'book' : 'books' ?><?= $filtered ? ($pages['total'] === 1 ? ' matches' : ' match') . ' these filters' : ' in the catalogue' ?>.</p>
+    <?php if ($books) : ?>
+        <?= csv_link() ?>
+    <?php endif; ?>
+</div>
 
 <div class="table-scroll">
     <table>
@@ -98,4 +116,5 @@ require __DIR__ . '/../includes/header.php';
         </tbody>
     </table>
 </div>
+<?= pagination_nav($pages) ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

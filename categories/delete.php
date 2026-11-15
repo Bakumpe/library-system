@@ -98,7 +98,7 @@ require __DIR__ . '/../includes/header.php';
     </p>
     <p><a href="<?= e(url('categories/index.php')) ?>">Back to categories</a></p>
 <?php else : ?>
-    <form method="post" class="form" onsubmit="return confirm('Delete this category? This cannot be undone.');">
+    <form method="post" class="form" data-confirm="Delete this category? This cannot be undone.">
         <?= csrf_field() ?>
         <input type="hidden" name="id" value="<?= (int) $category_id ?>">
         <button class="btn btn--danger" type="submit">Delete category</button>

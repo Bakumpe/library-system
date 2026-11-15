@@ -102,14 +102,15 @@ $stmt = $pdo->query(
 );
 $loans = $stmt->fetchAll();
 
+if ($error !== null) {
+    flash_now('error', $error);
+}
+
 $page_title = 'Return a book';
 require __DIR__ . '/../includes/header.php';
 ?>
 <h1>Return a book</h1>
 
-<?php if ($error !== null) : ?>
-    <p class="flash flash--error" role="alert"><?= e($error) ?></p>
-<?php endif; ?>
 
 <?php if ($loans === []) : ?>
     <p>There are no books currently on loan.</p>
@@ -133,7 +134,7 @@ require __DIR__ . '/../includes/header.php';
                         <td><?= e($loan['date_issued']) ?></td>
                         <td><?= e($loan['due_date']) ?></td>
                         <td>
-                            <form method="post">
+                            <form method="post" data-confirm="Record the return of <?= e($loan['title']) ?> from <?= e($loan['full_name']) ?>?">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="loan_id" value="<?= e($loan['loan_id']) ?>">
                                 <button class="btn" type="submit">Record return</button>

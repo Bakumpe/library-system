@@ -96,6 +96,9 @@ if [ "$FULL" = 1 ]; then
   fi
   echo "Testing $BASE_URL"
   run "App smoke test" env BASE_URL="$BASE_URL" bash .github/scripts/check-smoke.sh
+
+  step "Business rules (tries to break each one, then re-imports the sample data)"
+  run "Business rules" env BASE_URL="$BASE_URL" MYSQL="$MYSQL" bash .github/scripts/check-rules.sh
 fi
 
 printf '\n%s== Summary%s\n' "$B" "$N"

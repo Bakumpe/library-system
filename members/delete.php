@@ -86,7 +86,7 @@ require __DIR__ . '/../includes/header.php';
     <p><a href="<?= e(url('members/index.php')) ?>">Back to members</a></p>
 <?php else : ?>
     <p>Delete <strong><?= e($member['full_name']) ?></strong> (<?= e($member['member_number']) ?>)? This cannot be undone.</p>
-    <form method="post" class="form" data-busy-form>
+    <form method="post" class="form" data-busy-form data-confirm="Delete <?= e($member['full_name']) ?>? This cannot be undone.">
         <?= csrf_field() ?>
         <input type="hidden" name="id" value="<?= (int) $member_id ?>">
         <div class="form__actions">

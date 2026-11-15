@@ -85,7 +85,7 @@ require __DIR__ . '/../includes/header.php';
     <p><a href="<?= e(url('books/index.php')) ?>">Back to books</a></p>
 <?php else : ?>
     <p>Delete <strong><?= e($book['title']) ?></strong> (ISBN <?= e($book['isbn']) ?>)? This cannot be undone.</p>
-    <form method="post" class="form" data-busy-form>
+    <form method="post" class="form" data-busy-form data-confirm="Delete <?= e($book['title']) ?>? This cannot be undone.">
         <?= csrf_field() ?>
         <input type="hidden" name="id" value="<?= (int) $book_id ?>">
         <div class="form__actions">

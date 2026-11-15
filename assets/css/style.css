@@ -220,6 +220,7 @@ tbody tr:hover { background: rgba(214, 165, 76, 0.08); }
 .row-actions .link-button { color: inherit; font-weight: inherit; text-decoration: underline; }
 
 .page-head {
+  margin-bottom: 0.75rem;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -609,4 +610,52 @@ tbody tr:hover { background: rgba(214, 165, 76, 0.08); }
   .js .toasts { top: auto; right: 1rem; bottom: 1rem; left: 1rem; width: auto; }
   @keyframes toast-in { from { opacity: 0; transform: translateY(1rem); } }
   @keyframes toast-out { to { opacity: 0; transform: translateY(1rem); } }
+}
+
+/* Dashboard: two panels side by side on wide screens */
+.tally dd.tally__money { font-size: 1.375rem; line-height: 1.6; white-space: nowrap; }
+td.num, td.nowrap { white-space: nowrap; }
+.panels { display: grid; gap: 1.5rem; margin-top: 1.5rem; }
+.panel { min-width: 0; padding: 1.25rem; background: var(--sheet); border: 1px solid var(--line); }
+.panel h2 { margin: 0; font-size: 1.375rem; }
+.panel__note { margin: 0.25rem 0 1rem; font-size: 0.875rem; color: var(--ink-soft); }
+@media (min-width: 64rem) {
+  .panels { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }
+}
+
+/* Bar chart: loans per category. The fill is all loans; the darker part inside it is still out. */
+.bars { display: grid; gap: 0.875rem; margin: 0; padding: 0; list-style: none; }
+.bars__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 0.75rem; align-items: center; }
+.bars__label { font-weight: 700; font-size: 0.9375rem; }
+.bars__value { font: 700 0.9375rem var(--typed); text-align: right; white-space: nowrap; }
+.bars__value small { font-weight: 400; color: var(--ink-soft); }
+.bars__track { grid-column: 1 / -1; display: block; height: 0.875rem; background: var(--line); }
+.bars__fill { display: block; height: 100%; min-width: 2px; background: var(--accent); }
+.bars__out { display: block; height: 100%; background: var(--stamp); }
+
+/* List pages: the count with the export link, and the page links under the table */
+.list-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.75rem; }
+.list-head p { margin: 0; }
+.page-head__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.pager { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.5rem 1.5rem; margin-top: 1rem; }
+.pager span { font: 0.875rem var(--typed); color: var(--ink-soft); }
+.pager a { font-weight: 700; }
+.pager [aria-disabled] { opacity: 0.5; }
+
+/* Phones: each table row becomes a card, with the column name beside each value (labels from app.js) */
+@media (max-width: 40rem) {
+  .table-scroll { overflow: visible; }
+  table.is-labelled, table.is-labelled tbody, table.is-labelled tr, table.is-labelled td { display: block; width: 100%; }
+  table.is-labelled { background: transparent; }
+  table.is-labelled thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  table.is-labelled tr { margin-bottom: 0.75rem; padding: 0.5rem 0.75rem; background: var(--sheet); border: 1px solid var(--line); }
+  table.is-labelled td { position: relative; padding: 0.375rem 0 0.375rem 7.25rem; border-bottom: 1px dashed var(--line); text-align: left; white-space: normal; }
+  table.is-labelled td:last-child { border-bottom: 0; }
+  table.is-labelled td[data-label]::before { content: attr(data-label); position: absolute; top: 0.6rem; left: 0; width: 6.5rem; font: 700 0.6875rem var(--typed); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
+  table.is-labelled td:not([data-label]) { padding-left: 0; }
+  .cell--wide { min-width: 0; }
+  .row-actions { white-space: normal; }
+  .page-head { align-items: flex-start; }
+  .form { max-width: none; }
+  .btn { padding: 0.625rem 1.125rem; }
 }

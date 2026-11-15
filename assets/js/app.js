@@ -169,3 +169,16 @@ document.querySelectorAll('.field__code').forEach(function (input) {
         input.value = digits.length > 3 ? digits.slice(0, 3) + ' ' + digits.slice(3) : digits;
     });
 });
+
+// Phone tables: copy each column heading onto its cells, so the CSS can show every row as a labelled card.
+document.querySelectorAll('.table-scroll table').forEach(function (table) {
+    var headings = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
+        return th.textContent.trim();
+    });
+    table.querySelectorAll('tbody tr').forEach(function (row) {
+        Array.prototype.forEach.call(row.children, function (cell, index) {
+            if (headings[index] && cell.colSpan === 1) cell.setAttribute('data-label', headings[index]);
+        });
+    });
+    table.classList.add('is-labelled');
+});

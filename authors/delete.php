@@ -97,7 +97,7 @@ require __DIR__ . '/../includes/header.php';
     </p>
     <p><a href="<?= e(url('authors/index.php')) ?>">Back to authors</a></p>
 <?php else : ?>
-    <form method="post" class="form" onsubmit="return confirm('Delete this author? This cannot be undone.');">
+    <form method="post" class="form" data-confirm="Delete <?= e($author['name']) ?>? This cannot be undone.">
         <?= csrf_field() ?>
         <input type="hidden" name="id" value="<?= (int) $author_id ?>">
         <button class="btn btn--danger" type="submit">Delete author</button>
