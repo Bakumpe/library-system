@@ -106,7 +106,9 @@ require __DIR__ . '/../includes/header.php';
                 </td>
                 <td>
                     <a href="<?= e(url('books/edit.php?id=' . (int) $book['book_id'])) ?>">Edit</a>
-                    <a href="<?= e(url('books/delete.php?id=' . (int) $book['book_id'])) ?>">Delete</a>
+                    <?php if (is_admin()) : ?>
+                        <a href="<?= e(url('books/delete.php?id=' . (int) $book['book_id'])) ?>">Delete</a>
+                    <?php endif; ?>
                 </td>
             </tr>
         <?php endforeach; ?>

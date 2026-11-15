@@ -104,7 +104,9 @@ require __DIR__ . '/../includes/header.php';
                         <input type="hidden" name="back" value="<?= e($back) ?>">
                         <button class="link-button" type="submit"><?= $active ? 'Suspend' : 'Reactivate' ?></button>
                     </form>
-                    <a href="<?= e(url('members/delete.php?id=' . (int) $member['member_id'])) ?>">Delete</a>
+                    <?php if (is_admin()) : ?>
+                        <a href="<?= e(url('members/delete.php?id=' . (int) $member['member_id'])) ?>">Delete</a>
+                    <?php endif; ?>
                 </td>
             </tr>
         <?php endforeach; ?>

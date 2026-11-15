@@ -70,7 +70,9 @@ require __DIR__ . '/../includes/header.php';
                 <td class="num"><?= e($category['titles']) ?></td>
                 <td>
                     <a href="<?= e(url('categories/edit.php?id=' . (int) $category['category_id'])) ?>">Edit</a>
-                    <a href="<?= e(url('categories/delete.php?id=' . (int) $category['category_id'])) ?>">Delete</a>
+                    <?php if (is_admin()) : ?>
+                        <a href="<?= e(url('categories/delete.php?id=' . (int) $category['category_id'])) ?>">Delete</a>
+                    <?php endif; ?>
                 </td>
             </tr>
         <?php endforeach; ?>

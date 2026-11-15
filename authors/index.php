@@ -72,7 +72,9 @@ require __DIR__ . '/../includes/header.php';
                 <td class="num"><?= e($author['titles']) ?></td>
                 <td>
                     <a href="<?= e(url('authors/edit.php?id=' . (int) $author['author_id'])) ?>">Edit</a>
-                    <a href="<?= e(url('authors/delete.php?id=' . (int) $author['author_id'])) ?>">Delete</a>
+                    <?php if (is_admin()) : ?>
+                        <a href="<?= e(url('authors/delete.php?id=' . (int) $author['author_id'])) ?>">Delete</a>
+                    <?php endif; ?>
                 </td>
             </tr>
         <?php endforeach; ?>

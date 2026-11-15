@@ -115,6 +115,7 @@ a { color: inherit; }
   color: var(--lamp-ink);
   font-weight: 700;
 }
+.stacks__role { font: 700 0.6875rem var(--typed); letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
 .stacks__user { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0 0 0 auto; font-size: 0.875rem; }
 
 /* Page */
@@ -490,23 +491,6 @@ tbody tr:hover { background: rgba(214, 165, 76, 0.08); }
 }
 .tally__alert dd { color: var(--stamp); }
 
-/* Placeholder for pages still to be built */
-.todo {
-  padding: 1.25rem;
-  border: 2px dashed var(--ink-soft);
-}
-.todo__stamp {
-  display: inline-block;
-  margin: 0 0 0.75rem;
-  padding: 0.125rem 0.5rem;
-  border: 2px solid var(--lamp);
-  color: var(--ink);
-  font: 700 0.875rem var(--typed);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.todo__owner { margin: 0; font-weight: 700; }
-.todo ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
 
 @media (max-width: 40rem) {
   h1 { font-size: 1.875rem; }

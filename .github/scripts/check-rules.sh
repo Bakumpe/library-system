@@ -108,6 +108,20 @@ expect "Two members cannot share an email" "Another member already uses this ema
 same "The refused book and member were not saved" 0 \
   "$(sql "SELECT (SELECT COUNT(*) FROM books WHERE title = 'Copy') + (SELECT COUNT(*) FROM members WHERE member_number = 'MEM-9999')")"
 
+# --- Admin and librarian limits
+LIB=$(mktemp)
+t=$(curl -s -b "$LIB" -c "$LIB" "$BASE/auth/login.php" | sed -n 's/.*name="csrf_token" value="\([^"]*\)".*/\1/p' | head -1)
+curl -s -o /dev/null -b "$LIB" -c "$LIB" --data-urlencode "csrf_token=$t" -d 'username=librarian&password=library123' "$BASE/auth/login.php"
+spare=$(sql "SELECT category_id FROM categories c WHERE NOT EXISTS (SELECT 1 FROM books b WHERE b.category_id = c.category_id) LIMIT 1")
+lt=$(curl -s -b "$LIB" -c "$LIB" "$BASE/books/create.php" | sed -n 's/.*name="csrf_token" value="\([^"]*\)".*/\1/p' | head -1)
+expect "A librarian cannot delete records" "Only an admin can delete records." \
+  "$(curl -s -L -b "$LIB" -c "$LIB" --data-urlencode "csrf_token=$lt" -d "id=$spare" "$BASE/categories/delete.php")"
+same "The librarian's delete changed nothing" 1 "$(sql "SELECT COUNT(*) FROM categories WHERE category_id = $spare")"
+same "A librarian sees no Delete links" 0 \
+  "$(curl -s -b "$LIB" "$BASE/books/index.php" | grep -c 'books/delete.php')"
+expect "A librarian can still issue a book" "Book issued. It is due in 14 days." \
+  "$(curl -s -L -b "$LIB" -c "$LIB" --data-urlencode "csrf_token=$lt" -d "member_id=$active&book_id=$free_book" "$BASE/loans/issue.php")"
+
 # --- Fines and reports
 late=$(sql "SELECT DATEDIFF(CURDATE(), due_date) FROM loans WHERE date_returned IS NULL AND due_date < CURDATE() ORDER BY due_date LIMIT 1")
 csv=$(curl -s -b "$JAR" "$BASE/dashboard/index.php?export=csv")

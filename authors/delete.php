@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/auth_check.php';
+require_admin('authors/index.php');
 require_once __DIR__ . '/../config/database.php';
 
 if (!in_array($_SERVER['REQUEST_METHOD'], ['GET', 'POST'], true)) {

@@ -156,6 +156,8 @@ These are fake test accounts. Do not reuse the passwords anywhere.
 
 After logging in, the dashboard should show 10 titles, 8 active members and 3 overdue loans.
 
+**What each role can do.** Librarians run the desk: they add and edit books, members, authors and categories, issue and return loans, and suspend or reactivate members. Only admins can delete records. The Delete links are hidden from librarians, and the delete pages refuse them.
+
 ### Accounts and passwords
 
 - **Log in** with either your username or your email.

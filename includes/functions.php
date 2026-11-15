@@ -225,13 +225,20 @@ function theme_toggle(): string
     return '<button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch colour theme">Theme</button>';
 }
 
-/** Placeholder body for a page nobody has built yet. Delete the call when you build the page. */
-function page_todo(string $owner, array $tasks): void
+/** True when the logged-in user is an admin. Librarians are everyone else. */
+function is_admin(): bool
 {
-    echo '<section class="todo"><p class="todo__stamp">Not built yet</p>';
-    echo '<p class="todo__owner">Workstream: ' . e($owner) . '</p><ul>';
-    foreach ($tasks as $task) {
-        echo '<li>' . e($task) . '</li>';
+    return ($_SESSION['role'] ?? '') === 'admin';
+}
+
+/**
+ * Admin-only pages call this after auth_check.php. A librarian is sent back to $back with a message.
+ * Librarians run the desk: add and edit records, issue and return, suspend. Deleting records is for admins.
+ */
+function require_admin(string $back): void
+{
+    if (!is_admin()) {
+        flash('error', 'Only an admin can delete records. Ask an admin, or suspend the member instead.');
+        redirect($back);
     }
-    echo '</ul></section>';
 }

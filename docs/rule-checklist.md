@@ -19,6 +19,8 @@ Reset the data first with `composer dev:seed`. In the sample data:
 | [ ] | Wrong passwords fail | Log in as `admin` with `wrong` | "Those details do not match an account." | auto |
 | [ ] | No form works without its CSRF token | Change the hidden `csrf_token` in DevTools, then submit | 403 page, nothing saved | auto |
 | [ ] | Passwords are hashed | phpMyAdmin, `users` table | `password_hash` starts with `$2y$` | auto |
+| [ ] | Only admins delete records | Log in as `librarian`, open `/categories/delete.php?id=5` | "Only an admin can delete records." and nothing deleted | auto |
+| [ ] | Librarians run the desk | As `librarian`: add a book, issue and return a loan, suspend a member | All work; no Delete links on any list | auto |
 | [ ] | New accounts confirm their email | Sign up, then log in before typing the code | Asked for the 6-digit code | |
 | [ ] | Codes expire and run out | Type a wrong code 5 times | "Too many wrong tries. Ask for a new code." | |
 

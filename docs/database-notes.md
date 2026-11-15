@@ -9,7 +9,7 @@
   open loans by member, loan totals by category, overdue loans with days overdue
   and member phone numbers, and books with their authors, categories, and copies
   currently out.
-- Finalized [`database/erd.png`](../database/erd.png) to show the six tables and
+- Finalized [`database/erd.png`](../database/erd.png) (updated for the users email and code columns) to show the six tables and
   the open-loan guard.
 - Wrote the table-by-table normalization explanation in
   [`docs/database-design.md`](database-design.md), including the design's

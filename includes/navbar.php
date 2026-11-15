@@ -20,7 +20,7 @@ $here = $_SERVER['SCRIPT_NAME'] ?? '';
     </nav>
     <p class="stacks__user">
         <?= theme_toggle() ?>
-        <span><?= e($_SESSION['full_name'] ?? '') ?></span>
+        <span><?= e($_SESSION['full_name'] ?? '') ?> <span class="stacks__role"><?= is_admin() ? 'Admin' : 'Librarian' ?></span></span>
         <a href="<?= e(url('auth/change_password.php')) ?>">Change password</a>
         <a href="<?= e(url('auth/logout.php')) ?>">Log out</a>
     </p>

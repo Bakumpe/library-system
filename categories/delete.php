@@ -1,6 +1,7 @@
 <?php
 // Guarded delete: a category that still has books stays. fk_books_category (ON DELETE RESTRICT) backs this up.
 require_once __DIR__ . '/../includes/auth_check.php';
+require_admin('categories/index.php');
 require_once __DIR__ . '/../config/database.php';
 
 if (!in_array($_SERVER['REQUEST_METHOD'], ['GET', 'POST'], true)) {
