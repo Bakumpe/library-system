@@ -2,136 +2,97 @@
 require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
 
-$errors = [];
-$member = null;
-$canDelete = false;
-$requestMethod = $_SERVER['REQUEST_METHOD'];
-if ($requestMethod === 'POST') {
-    require_csrf();
+$member_id = filter_input($_SERVER['REQUEST_METHOD'] === 'POST' ? INPUT_POST : INPUT_GET, 'id', FILTER_VALIDATE_INT);
+if (!$member_id || $member_id < 1) {
+    flash('error', 'Choose a member to delete.');
+    redirect('members/index.php');
 }
 
-$loanCount = null;
-$openLoanCount = null;
-$memberId = $requestMethod === 'POST'
-    ? post_text('member_id')
-    : ($_GET['id'] ?? '');
-$validMemberId = is_string($memberId)
-    ? filter_var($memberId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 4294967295]])
-    : false;
+// books_out: loans not returned yet. past_loans: returned ones, which keep the member as part of the loan history.
+$load = 'SELECT m.full_name, m.member_number,
+                SUM(l.loan_id IS NOT NULL AND l.date_returned IS NULL) AS books_out,
+                SUM(l.date_returned IS NOT NULL) AS past_loans
+         FROM members m
+         LEFT JOIN loans l ON l.member_id = m.member_id
+         WHERE m.member_id = ?
+         GROUP BY m.member_id, m.full_name, m.member_number';
 
-if (!in_array($requestMethod, ['GET', 'POST'], true)) {
-    header('Allow: GET, POST');
-    http_response_code(405);
-    $errors[] = 'This request method is not allowed.';
-} elseif ($validMemberId === false) {
-    http_response_code(400);
-    $errors[] = 'A valid member ID is required.';
-} else {
-    $memberId = (int) $validMemberId;
+/** Why this member cannot be deleted, or null when they can. */
+function member_delete_block_reason(array $member): ?string
+{
+    $out = (int) $member['books_out'];
+    if ($out > 0) {
+        return $member['full_name'] . ' cannot be deleted: they still hold ' . $out . ' ' . ($out === 1 ? 'book' : 'books')
+            . '. Return ' . ($out === 1 ? 'it' : 'them') . ' first.';
+    }
+    if ((int) $member['past_loans'] > 0) {
+        return $member['full_name'] . ' cannot be deleted: they appear in past loans, and those records must keep them. '
+            . 'Suspend the member instead.';
+    }
+    return null;
+}
 
-    if ($requestMethod === 'POST') {
-        try {
-            $pdo->beginTransaction();
-
-            $stmt = $pdo->prepare('SELECT member_id, member_number, full_name FROM members WHERE member_id = ? FOR UPDATE');
-            $stmt->execute([$memberId]);
-            $member = $stmt->fetch();
-
-            if (!$member) {
-                $pdo->rollBack();
-                http_response_code(404);
-                $errors[] = 'That member could not be found.';
-            } else {
-                $stmt = $pdo->prepare(
-                    'SELECT COUNT(*) AS loan_count,
-                            COALESCE(SUM(date_returned IS NULL), 0) AS open_loan_count
-                     FROM loans
-                     WHERE member_id = ?'
-                );
-                $stmt->execute([$memberId]);
-                $loanCounts = $stmt->fetch();
-                $loanCount = (int) $loanCounts['loan_count'];
-                $openLoanCount = (int) $loanCounts['open_loan_count'];
-
-                if ($openLoanCount > 0) {
-                    $pdo->rollBack();
-                    $errors[] = "This member has {$openLoanCount} unreturned " .
-                        ($openLoanCount === 1 ? 'book' : 'books') . ' and cannot be deleted.';
-                } elseif ($loanCount > 0) {
-                    $pdo->rollBack();
-                    $errors[] = 'This member has loan history that must be preserved, so the member cannot be deleted.';
-                } else {
-                    $stmt = $pdo->prepare('DELETE FROM members WHERE member_id = ?');
-                    $stmt->execute([$memberId]);
-                    $pdo->commit();
-
-                    flash('success', 'Member deleted successfully.');
-                    redirect('members/index.php');
-                }
-            }
-        } catch (PDOException $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-
-            if (is_in_use_error($e)) {
-                $errors[] = 'This member has related loan records and cannot be deleted.';
-            } else {
-                error_log($e->getMessage());
-                $errors[] = 'The member could not be deleted. Please try again.';
-            }
-        }
-    } else {
-        $stmt = $pdo->prepare('SELECT member_id, member_number, full_name FROM members WHERE member_id = ?');
-        $stmt->execute([$memberId]);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
+    try {
+        // Lock the member so nobody issues them a book between the check and the delete.
+        $pdo->beginTransaction();
+        $pdo->prepare('SELECT member_id FROM members WHERE member_id = ? FOR UPDATE')->execute([$member_id]);
+        $stmt = $pdo->prepare($load);
+        $stmt->execute([$member_id]);
         $member = $stmt->fetch();
 
-        if (!$member) {
-            http_response_code(404);
-            $errors[] = 'That member could not be found.';
-        } else {
-            $stmt = $pdo->prepare(
-                'SELECT COUNT(*) AS loan_count,
-                        COALESCE(SUM(date_returned IS NULL), 0) AS open_loan_count
-                 FROM loans
-                 WHERE member_id = ?'
-            );
-            $stmt->execute([$memberId]);
-            $loanCounts = $stmt->fetch();
-            $loanCount = (int) $loanCounts['loan_count'];
-            $openLoanCount = (int) $loanCounts['open_loan_count'];
-            $canDelete = $loanCount === 0;
+        $reason = $member ? member_delete_block_reason($member) : 'That member is not on the list.';
+        if ($reason !== null) {
+            $pdo->rollBack();
+            flash('error', $reason);
+            redirect('members/index.php');
         }
+
+        $pdo->prepare('DELETE FROM members WHERE member_id = ?')->execute([$member_id]);
+        $pdo->commit();
+        flash('success', $member['full_name'] . ' deleted.');
+        redirect('members/index.php');
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        if (!is_in_use_error($e)) {
+            error_log('Member delete failed: ' . $e->getMessage());
+            throw $e;
+        }
+        // The loans table refused it (ON DELETE RESTRICT): a loan was recorded since we checked.
+        flash('error', 'That member cannot be deleted because loans refer to them.');
+        redirect('members/index.php');
     }
 }
+
+$stmt = $pdo->prepare($load);
+$stmt->execute([$member_id]);
+$member = $stmt->fetch();
+if (!$member) {
+    flash('error', 'That member is not on the list.');
+    redirect('members/index.php');
+}
+$reason = member_delete_block_reason($member);
 
 $page_title = 'Delete a member';
 require __DIR__ . '/../includes/header.php';
 ?>
 <h1>Delete a member</h1>
 
-<?php foreach ($errors as $error) : ?>
-    <p class="flash flash--error" role="alert"><?= e($error) ?></p>
-<?php endforeach; ?>
-
-<?php if ($member) : ?>
-    <p>Member: <strong><?= e($member['full_name']) ?></strong> (<?= e($member['member_number']) ?>)</p>
-
-    <?php if ($openLoanCount > 0) : ?>
-        <p>This member has <?= e($openLoanCount) ?> unreturned <?= $openLoanCount === 1 ? 'book' : 'books' ?>. Return them before deleting the member.</p>
-    <?php elseif ($loanCount > 0) : ?>
-        <p>This member has loan history. Loan records are retained, so this member cannot be deleted.</p>
-    <?php elseif ($canDelete) : ?>
-        <p>Are you sure you want to permanently delete this member?</p>
-        <form method="post" class="form" onsubmit="return confirm('Permanently delete this member?');">
-            <?= csrf_field() ?>
-            <input type="hidden" name="member_id" value="<?= e($member['member_id']) ?>">
-            <button class="btn" type="submit">Delete member</button>
-        </form>
-    <?php else : ?>
-        <p>Loan records could not be verified. The member has not been deleted; please try again.</p>
-    <?php endif; ?>
+<?php if ($reason !== null) : ?>
+    <p class="flash flash--error" role="alert"><?= e($reason) ?></p>
+    <p><a href="<?= e(url('members/index.php')) ?>">Back to members</a></p>
+<?php else : ?>
+    <p>Delete <strong><?= e($member['full_name']) ?></strong> (<?= e($member['member_number']) ?>)? This cannot be undone.</p>
+    <form method="post" class="form" data-busy-form>
+        <?= csrf_field() ?>
+        <input type="hidden" name="id" value="<?= (int) $member_id ?>">
+        <div class="form__actions">
+            <button class="btn btn--danger" type="submit" data-busy-label="Deleting…">Delete member</button>
+            <a href="<?= e(url('members/index.php')) ?>">Cancel</a>
+        </div>
+    </form>
 <?php endif; ?>
-
-<p><a class="btn btn--quiet" href="<?= e(url('members/index.php')) ?>">Back to members</a></p>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
