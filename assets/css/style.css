@@ -214,6 +214,10 @@ tbody tr:hover { background: rgba(214, 165, 76, 0.08); }
 .search--filters select { margin: 0; }
 .search--filters > .search__actions { display: flex; align-self: end; align-items: center; gap: 1rem; }
 .cell--wide { min-width: 12rem; }
+.row-actions { white-space: nowrap; }
+.row-actions > * { margin-right: 0.75rem; }
+.row-actions form { display: inline; }
+.row-actions .link-button { color: inherit; font-weight: inherit; text-decoration: underline; }
 
 .page-head {
   display: flex;
