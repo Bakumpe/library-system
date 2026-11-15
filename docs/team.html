@@ -77,18 +77,18 @@ ul.rules { display: grid; gap: 0.5rem; margin: 0; padding-left: 1.25rem; max-wid
   <section>
     <h2>Group members</h2>
     <div class="scroll"><table>
-      <thead><tr><th>Call no.</th><th>Member</th><th>Workstream</th></tr></thead>
+      <thead><tr><th>Call no.</th><th>Member</th><th>ID number</th><th>Workstream</th></tr></thead>
       <tbody>
-        <tr><td class="call">658.404</td><td class="name">Antonia Nyakato</td><td>Project management</td></tr>
-        <tr><td class="call">005.8</td><td class="name">Maway Abili Etienne</td><td>Foundation, login and security</td></tr>
-        <tr><td class="call">005.74</td><td class="name">Lukwago Joseph Bakumpe</td><td>Database design and reports</td></tr>
-        <tr><td class="call">025.3</td><td class="name">Mugalu Kevin</td><td>Books</td></tr>
-        <tr><td class="call">025.4</td><td class="name">Atyang Sarah</td><td>Authors and categories</td></tr>
-        <tr><td class="call">025.5</td><td class="name">Anai Achiek Wel Alith</td><td>Members</td></tr>
-        <tr><td class="call">025.6 I</td><td class="name">Unguech Unuech William Mawut</td><td>Issuing loans</td></tr>
-        <tr><td class="call">025.6 R</td><td class="name">Lwoto Josiah Jared</td><td>Loan returns and history</td></tr>
-        <tr><td class="call">001.4</td><td class="name">Ibrahim Ali Artan</td><td>Dashboard and reports</td></tr>
-        <tr><td class="call">005.437</td><td class="name">Ali Henry Fred Alimo</td><td>Layout, phone support and rule testing</td></tr>
+        <tr><td class="call">005.8</td><td class="name">Maway Abili Etienne</td><td class="call">161-552</td><td>Foundation, login and security</td></tr>
+        <tr><td class="call">658.404</td><td class="name">Antonia Nyakato</td><td class="call">260-296</td><td>Project management</td></tr>
+        <tr><td class="call">005.74</td><td class="name">Lukwago Joseph Bakumpe</td><td class="call">258-278</td><td>Database design and reports</td></tr>
+        <tr><td class="call">025.3</td><td class="name">Mugalu Kevin</td><td class="call">215-555</td><td>Books</td></tr>
+        <tr><td class="call">025.4</td><td class="name">Atyang Sarah</td><td class="call">264-111</td><td>Authors and categories</td></tr>
+        <tr><td class="call">025.5</td><td class="name">Anai Achiek Wel Alith</td><td class="call">208-350</td><td>Members</td></tr>
+        <tr><td class="call">025.6 I</td><td class="name">Unguech Unuech William Mawut</td><td class="call">250-773</td><td>Issuing loans</td></tr>
+        <tr><td class="call">025.6 R</td><td class="name">Lwoto Josiah Jared</td><td class="call">187-322</td><td>Loan returns and history</td></tr>
+        <tr><td class="call">001.4</td><td class="name">Ibrahim Ali Artan</td><td class="call">219-401</td><td>Dashboard and reports</td></tr>
+        <tr><td class="call">005.437</td><td class="name">Ali Henry Fred Alimo</td><td class="call">206-884</td><td>Layout, phone support and rule testing</td></tr>
       </tbody>
     </table></div>
   </section>
@@ -98,22 +98,23 @@ ul.rules { display: grid; gap: 0.5rem; margin: 0; padding-left: 1.25rem; max-wid
     <div class="drawers">
 
       <article class="drawer">
+        <header><span class="tag">005.8</span><h3>Foundation, login and security</h3><span class="who">Maway Abili Etienne</span></header>
+        <dl>
+          <div><dt>Database</dt><dd><code>users</code> table and test accounts.</dd></div>
+          <div><dt>Back end</dt><dd><code>config/</code>, <code>includes/</code>, <code>auth/</code>: sessions, password hashing, CSRF tokens. Admin and librarian limits.</dd></div>
+          <div><dt>Lead</dt><dd>Owns the repository: reviews and merges every pull request, coordinates the workstreams, fixes failing checks, reorganises shared code and completes unfinished features.</dd></div>
+          <div><dt>Screen</dt><dd>Login page, shared header, navigation and footer.</dd></div>
+          <div><dt>Demo proof</dt><dd>Open a protected page while logged out. Show a wrong password failing and a hash in the table.</dd></div>
+        </dl>
+      </article>
+
+      <article class="drawer">
         <header><span class="tag">658.404</span><h3>Project management</h3><span class="who">Antonia Nyakato</span></header>
         <dl>
           <div><dt>Plan</dt><dd>Run the task board against the seven stages in the brief. Hold a short check-in each week and keep the notes.</dd></div>
           <div><dt>Lecturer</dt><dd>Get the blanks in the brief confirmed: deadline, submission platform, demo length and AI policy.</dd></div>
           <div><dt>Delivery</dt><dd>Collect every member's section into <code>docs/report.pdf</code>. Build <code>LMS_[group name].zip</code> and submit it.</dd></div>
           <div><dt>Demo proof</dt><dd>Write the demo running order. Check that every member has commits on GitHub and can explain their code.</dd></div>
-        </dl>
-      </article>
-
-      <article class="drawer">
-        <header><span class="tag">005.8</span><h3>Foundation, login and security</h3><span class="who">Maway Abili Etienne</span></header>
-        <dl>
-          <div><dt>Database</dt><dd><code>users</code> table and test accounts.</dd></div>
-          <div><dt>Back end</dt><dd><code>config/</code>, <code>includes/</code>, <code>auth/</code>: sessions, password hashing, CSRF tokens. Admin and librarian limits.</dd></div>
-          <div><dt>Screen</dt><dd>Login page, shared header, navigation and footer. Reviews and merges pull requests.</dd></div>
-          <div><dt>Demo proof</dt><dd>Open a protected page while logged out. Show a wrong password failing and a hash in the table.</dd></div>
         </dl>
       </article>
 
@@ -217,7 +218,7 @@ ul.rules { display: grid; gap: 0.5rem; margin: 0; padding-left: 1.25rem; max-wid
     <ul class="rules">
       <li>Commit from your own GitHub account, in small steps. The brief marks regular commits from every member.</li>
       <li>Work on a branch named after your area, such as <code>books</code>, and open a pull request to <code>main</code>.</li>
-      <li>Copy the pattern in <code>authors/index.php</code> for new pages. Replace the "Not built yet" box when you build a page.</li>
+      <li>Check <code>includes/</code> for a helper before writing your own. Every form, list and delete page already shares one.</li>
       <li>Learn more than your own part. Any member can be asked to explain any code, and a member who can't is marked down individually.</li>
       <li>Write one report paragraph for your part, plus your screenshots, and give them to Antonia Nyakato.</li>
     </ul>

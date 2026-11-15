@@ -2,30 +2,36 @@
 require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/member_form.php';
+require_once __DIR__ . '/../includes/reports.php';
 
-$search = trim((string) ($_GET['q'] ?? ''));
-$status = (string) ($_GET['status'] ?? '');
-if (!isset(MEMBER_STATUSES[$status])) {
-    $status = '';
-}
+$search = get_text('q');
+$status = get_choice('status', MEMBER_STATUSES);
 
 // books_out counts each member's loans that are not returned yet. Each filter is skipped when it is empty.
-$stmt = $pdo->prepare(
-    'SELECT m.member_id, m.member_number, m.full_name, m.email, m.phone, m.status,
-            COUNT(l.loan_id) AS books_out
-     FROM members m
-     LEFT JOIN loans l ON l.member_id = m.member_id AND l.date_returned IS NULL
-     WHERE (? = \'\' OR m.full_name LIKE ? OR m.member_number LIKE ?)
-       AND (? = \'\' OR m.status = ?)
-     GROUP BY m.member_id, m.member_number, m.full_name, m.email, m.phone, m.status
-     ORDER BY m.full_name'
-);
+$where = ' WHERE (? = \'\' OR m.full_name LIKE ? OR m.member_number LIKE ?)
+             AND (? = \'\' OR m.status = ?)';
 $like = '%' . $search . '%';
-$stmt->execute([$search, $like, $like, $status, $status]);
-$members = $stmt->fetchAll();
+$params = [$search, $like, $like, $status, $status];
+$select = 'SELECT m.member_id, m.member_number, m.full_name, m.email, m.phone, m.status, m.date_joined,
+                  COUNT(l.loan_id) AS books_out
+           FROM members m
+           LEFT JOIN loans l ON l.member_id = m.member_id AND l.date_returned IS NULL'
+    . $where . '
+           GROUP BY m.member_id, m.member_number, m.full_name, m.email, m.phone, m.status, m.date_joined
+           ORDER BY m.full_name';
+
+if (wants_csv()) {
+    export_csv($pdo, $select, $params, 'members', ['Name', 'Member number', 'Email', 'Phone', 'Status', 'Joined', 'Books out'], fn (array $member) => [
+        $member['full_name'], $member['member_number'], $member['email'], $member['phone'],
+        MEMBER_STATUSES[$member['status']], $member['date_joined'], $member['books_out'],
+    ]);
+}
+
+$pages = paginate(count_rows($pdo, ' FROM members m' . $where, $params));
+$members = fetch_page($pdo, $select, $params, $pages);
 
 $filtered = $search !== '' || $status !== '';
-$back = $filtered ? '?' . http_build_query(['q' => $search, 'status' => $status]) : '';
+$back = query_link([]);
 
 $page_title = 'Members';
 require __DIR__ . '/../includes/header.php';
@@ -44,15 +50,15 @@ require __DIR__ . '/../includes/header.php';
         <label for="status">Status</label>
         <select id="status" name="status"><?= select_options(MEMBER_STATUSES, $status, 'All members') ?></select>
     </div>
-    <div class="search__actions">
-        <button class="btn btn--quiet" type="submit">Search</button>
-        <?php if ($filtered) : ?>
-            <a href="<?= e(url('members/index.php')) ?>">Clear</a>
-        <?php endif; ?>
-    </div>
+    <?= search_actions($filtered, 'members/index.php') ?>
 </form>
 
-<p><?= count($members) ?> <?= count($members) === 1 ? 'member' : 'members' ?><?= $filtered ? ' match' . (count($members) === 1 ? 'es' : '') . ' these filters' : '' ?>.</p>
+<div class="list-head">
+    <p><?= list_count($pages['total'], 'member', 'members', $filtered) ?></p>
+    <?php if ($members) : ?>
+        <?= csv_link() ?>
+    <?php endif; ?>
+</div>
 
 <div class="table-scroll">
     <table>
@@ -76,22 +82,23 @@ require __DIR__ . '/../includes/header.php';
                 <td><span class="pill pill--<?= $active ? 'active' : 'suspended' ?>"><?= e(MEMBER_STATUSES[$member['status']]) ?></span></td>
                 <td class="num"><?= e($member['books_out']) ?></td>
                 <td class="row-actions">
-                    <a href="<?= e(url('members/edit.php?id=' . (int) $member['member_id'])) ?>">Edit</a>
-                    <form method="post" action="<?= e(url('members/status.php')) ?>">
+                    <?= edit_link('members', (int) $member['member_id']) ?>
+                    <form method="post" action="<?= e(url('members/status.php')) ?>"<?= $active ? ' data-confirm="' . e('Suspend ' . $member['full_name'] . '? They will not be able to borrow books until reactivated.') . '"' : '' ?>>
                         <?= csrf_field() ?>
                         <input type="hidden" name="id" value="<?= (int) $member['member_id'] ?>">
                         <input type="hidden" name="status" value="<?= $active ? 'suspended' : 'active' ?>">
                         <input type="hidden" name="back" value="<?= e($back) ?>">
                         <button class="link-button" type="submit"><?= $active ? 'Suspend' : 'Reactivate' ?></button>
                     </form>
-                    <a href="<?= e(url('members/delete.php?id=' . (int) $member['member_id'])) ?>">Delete</a>
+                    <?= delete_link('members', (int) $member['member_id']) ?>
                 </td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$members) : ?>
-            <tr><td colspan="6"><?= $filtered ? 'No members match these filters.' : 'No members yet. Add the first one.' ?></td></tr>
+            <?= empty_row(6, $filtered ? 'No members match these filters.' : 'No members yet. Add the first one.') ?>
         <?php endif; ?>
         </tbody>
     </table>
 </div>
+<?= pagination_nav($pages) ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

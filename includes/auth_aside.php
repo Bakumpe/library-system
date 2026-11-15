@@ -1,6 +1,6 @@
 <?php
 
-// The lamp-lit panel beside every sign-in form. Set $aside_note before including it to change the line under the title.
+// The panel beside the sign-in forms. Set $aside_note first to change its line of text.
 $aside_note = $aside_note ?? 'Every book in its place, every loan back on time.';
 ?>
 <aside class="auth__aside" aria-hidden="true">

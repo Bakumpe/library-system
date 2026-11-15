@@ -1,10 +1,8 @@
 <?php
 // Step 1 of a password reset: email a code to the account's address.
 require_once __DIR__ . '/../includes/functions.php';
-
-if (!empty($_SESSION['user_id'])) {
-    redirect('auth/change_password.php');
-}
+require_once __DIR__ . '/../includes/auth_form.php';
+redirect_if_logged_in('auth/change_password.php');
 
 $login = '';
 $errors = [];
@@ -20,9 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         require_once __DIR__ . '/../config/database.php';
         require_once __DIR__ . '/../includes/mailer.php';
 
-        $stmt = $pdo->prepare('SELECT user_id, email, full_name FROM users WHERE username = ? OR email = ?');
-        $stmt->execute([$login, $login]);
-        $user = $stmt->fetch();
+        $user = find_user($pdo, $login);
 
         // Say the same thing whether or not the account exists, so nobody can test which ones do.
         $_SESSION['reset_user_id'] = $user ? (int) $user['user_id'] : 0;

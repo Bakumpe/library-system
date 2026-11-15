@@ -1,9 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/functions.php';
-
-if (!empty($_SESSION['user_id'])) {
-    redirect('dashboard/index.php');
-}
+require_once __DIR__ . '/../includes/auth_form.php';
+redirect_if_logged_in();
 
 $full_name = '';
 $username = '';
@@ -19,15 +17,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username  = strtolower(post_text('username'));
     $email     = strtolower(post_text('email'));
     $password  = post_password('password');
-    $confirm   = post_password('password_confirm');
 
     $errors = array_filter([
-        'full_name'        => validate_required($full_name, 'Full name', 120),
-        'username'         => validate_username($username),
-        'email'            => validate_required($email, 'Email', 190) ?? validate_email($email),
-        'password'         => validate_new_password($password, $password),
-        'password_confirm' => $password !== $confirm ? 'The two passwords do not match.' : null,
-    ]);
+        'full_name' => validate_required($full_name, 'Full name', 120),
+        'username'  => validate_username($username),
+        'email'     => validate_required($email, 'Email', 190) ?? validate_email($email),
+    ]) + new_password_errors($password, post_password('password_confirm'), 'password', 'password_confirm');
 
     // Check for taken names up front, so every problem shows at once. The UNIQUE keys still catch a race.
     $stmt = $pdo->prepare('SELECT username = ? AS username_taken, email = ? AS email_taken FROM users WHERE username = ? OR email = ?');
@@ -54,15 +49,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('auth/verify_email.php');
         } catch (PDOException $e) {
             if (!is_duplicate_error($e)) {
-                error_log('Sign-up failed: ' . $e->getMessage());
                 throw $e;
             }
             $errors['username'] = 'That username or email was just taken. Try again.';
         }
     }
 
-    // A successful sign-up has redirected by now, so there are errors to point at.
-    flash_now('error', count($errors) === 1 ? 'Fix the highlighted field to continue.' : 'Fix the ' . count($errors) . ' highlighted fields to continue.');
+    flash_form_errors($errors, 'continue');
 }
 
 $first_error = array_key_first($errors) ?? 'full_name';
@@ -103,26 +96,8 @@ require __DIR__ . '/../includes/header.php';
                 <?= field_error($errors, 'email') ?>
             </div>
 
-            <div class="field">
-                <label for="password">Password</label>
-                <div class="field__password">
-                    <input id="password" name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password"
-                        data-strength="password-strength" required<?= $first_error === 'password' ? ' autofocus' : '' ?><?= field_attrs($errors, 'password') ?>>
-                    <button type="button" class="field__reveal" data-reveal="password" aria-pressed="false">Show</button>
-                </div>
-                <div class="strength" id="password-strength" aria-live="polite"><span class="strength__bar"></span><span class="strength__label">At least 8 characters</span></div>
-                <?= field_error($errors, 'password') ?>
-            </div>
-
-            <div class="field">
-                <label for="password_confirm">Type the password again</label>
-                <div class="field__password">
-                    <input id="password_confirm" name="password_confirm" type="password" minlength="8" maxlength="72" autocomplete="new-password"
-                        data-match="password" required<?= $first_error === 'password_confirm' ? ' autofocus' : '' ?><?= field_attrs($errors, 'password_confirm') ?>>
-                    <button type="button" class="field__reveal" data-reveal="password_confirm" aria-pressed="false">Show</button>
-                </div>
-                <?= field_error($errors, 'password_confirm') ?>
-            </div>
+            <?= password_field($errors, 'password', 'Password', ['strength' => true, 'autofocus' => $first_error === 'password']) ?>
+            <?= password_field($errors, 'password_confirm', 'Type the password again', ['match' => 'password', 'autofocus' => $first_error === 'password_confirm']) ?>
 
             <button class="btn btn--block" type="submit" data-busy-label="Creating your account…">Create account</button>
         </form>

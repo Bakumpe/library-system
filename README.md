@@ -4,6 +4,8 @@
 
 A web system that lets librarians manage books, members and loans from a browser. All data is stored in MySQL (MariaDB). Built with PHP, HTML, CSS and JavaScript by Group Sixteen for Database 2, CAT 2.
 
+> We also use this project to practise working as a real software team. Each of us at Cavendish University Uganda owns a part and works on a branch. Every change goes through a pull request, passes the automated checks and gets reviewed before it reaches `main`.
+
 ## Quick start
 
 After setting up once (Windows or Mac steps below), these are the only commands you need. Run them from the project folder, in Git Bash on Windows or Terminal on a Mac.
@@ -156,6 +158,8 @@ These are fake test accounts. Do not reuse the passwords anywhere.
 
 After logging in, the dashboard should show 10 titles, 8 active members and 3 overdue loans.
 
+**What each role can do.** Librarians run the desk: they add and edit books, members, authors and categories, issue and return loans, and suspend or reactivate members. Only admins can delete records. The Delete links are hidden from librarians, and the delete pages refuse them.
+
 ### Accounts and passwords
 
 - **Log in** with either your username or your email.
@@ -219,6 +223,7 @@ Then run these from the project folder. On Windows, use Git Bash.
 | `composer code:check:full` | Runs the code checks plus the database import and the app test |
 | `composer code:fix` | Fixes PHP code style automatically |
 | `composer hooks:install` | Runs the checks before every `git push` (once per clone) |
+| `composer package -- "Group Sixteen"` | Builds `LMS_Group_Sixteen.zip` for submission, next to the project folder. It holds exactly the brief's layout, without the developer files (`composer.json`, `.github/`, `.env`). Export `docs/report.docx` to `docs/report.pdf` first. |
 
 `composer list` shows them all. Without Composer, run the scripts directly, for example `bash .github/scripts/dev.sh doctor` or `bash .github/scripts/check-all.sh --fix`. If something doesn't work, start with `composer dev:doctor`. The manual steps are below.
 
@@ -287,7 +292,7 @@ library-system/
 ├── README.md
 ├── config/database.php  the one database connection
 ├── database/            library_db.sql, queries.sql, erd.png
-├── includes/            header, navbar, footer, auth_check, functions
+├── includes/            header, navbar, footer, auth_check, functions, shared forms
 ├── auth/                login and logout
 ├── dashboard/           summary after login
 ├── books/               list, create, edit, delete
@@ -303,16 +308,16 @@ library-system/
 
 Group members and who builds what: [docs/team.html](docs/team.html).
 
-**Build a page.** `authors/index.php` is the working example. Copy its pattern:
+**Build a page.** Look at `authors/index.php` and `authors/edit.php` first. Every page follows the same rules:
 
 1. `require_once` `includes/auth_check.php` on the first line.
 2. Call `require_csrf()` when handling a POST, and print `csrf_field()` inside every POST form.
-3. Validate every field on the server with the helpers in `includes/functions.php`.
+3. Validate every field on the server. Each record type keeps its form in one file, such as `includes/book_form.php`, used by both the add and edit pages.
 4. Run every query with `$pdo->prepare()` and `execute()`. Never put user input into an SQL string.
 5. Use `flash()` for the success or error message, then `redirect()`.
 6. Print anything from the database or a form with `e()`.
 
-Pages showing a "Not built yet" box are waiting for their owner. Delete the `page_todo()` call when you build the page.
+Check `includes/functions.php` and `includes/reports.php` before writing a helper; it may already exist. The delete pages all use `includes/delete_page.php`.
 
 **Commit your work.** The brief marks regular commits from every member, so commit from your own GitHub account. Only the repository owner can push to `main` or merge, so everyone else works on a fork and sends a pull request:
 

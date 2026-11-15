@@ -13,12 +13,13 @@ document.addEventListener('submit', function (event) {
     var sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
     var moon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>';
 
-    function current() {
-        return root.getAttribute('data-theme') || (systemDark.matches ? 'dark' : 'light');
+    function other() {
+        var current = root.getAttribute('data-theme') || (systemDark.matches ? 'dark' : 'light');
+        return current === 'dark' ? 'light' : 'dark';
     }
 
     function paint() {
-        var next = current() === 'dark' ? 'light' : 'dark';
+        var next = other();
         document.querySelectorAll('[data-theme-toggle]').forEach(function (button) {
             button.innerHTML = (next === 'light' ? sun : moon) + '<span>' + (next === 'light' ? 'Light' : 'Dark') + '</span>';
             button.setAttribute('aria-label', 'Switch to ' + next + ' mode');
@@ -28,7 +29,7 @@ document.addEventListener('submit', function (event) {
     document.addEventListener('click', function (event) {
         var button = event.target.closest('[data-theme-toggle]');
         if (!button) return;
-        var next = current() === 'dark' ? 'light' : 'dark';
+        var next = other();
         root.setAttribute('data-theme', next);
         try { localStorage.setItem('theme', next); } catch { /* storage blocked: keep the choice for this visit only */ }
         paint();
@@ -168,4 +169,17 @@ document.querySelectorAll('.field__code').forEach(function (input) {
         var digits = input.value.replace(/\D/g, '').slice(0, 6);
         input.value = digits.length > 3 ? digits.slice(0, 3) + ' ' + digits.slice(3) : digits;
     });
+});
+
+// Phone tables: copy each column heading onto its cells, so the CSS can show every row as a labelled card.
+document.querySelectorAll('.table-scroll table').forEach(function (table) {
+    var headings = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
+        return th.textContent.trim();
+    });
+    table.querySelectorAll('tbody tr').forEach(function (row) {
+        Array.prototype.forEach.call(row.children, function (cell, index) {
+            if (headings[index] && cell.colSpan === 1) cell.setAttribute('data-label', headings[index]);
+        });
+    });
+    table.classList.add('is-labelled');
 });

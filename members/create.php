@@ -4,13 +4,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/member_form.php';
 
 $errors = [];
-$form = [
-    'member_number' => next_member_number($pdo),
-    'full_name' => '',
-    'email' => '',
-    'phone' => '',
-    'status' => 'active',
-];
+$form = ['member_number' => next_member_number($pdo)] + MEMBER_BLANK;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
@@ -23,20 +17,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'INSERT INTO members (member_number, full_name, email, phone, status, date_joined)
                  VALUES (?, ?, ?, ?, ?, CURRENT_DATE)'
             );
-            $stmt->execute([$form['member_number'], $form['full_name'], $form['email'], $form['phone'], $form['status']]);
+            $stmt->execute(member_values($form));
 
             flash('success', $form['full_name'] . ' joined as ' . $form['member_number'] . '.');
             redirect('members/index.php');
         } catch (PDOException $e) {
             if (!is_duplicate_error($e)) {
-                error_log('Member insert failed: ' . $e->getMessage());
                 throw $e;
             }
             $errors = member_duplicate_error($e);
         }
     }
-
-    flash_now('error', count($errors) === 1 ? 'Fix the highlighted field to add the member.' : 'Fix the ' . count($errors) . ' highlighted fields to add the member.');
+    flash_form_errors($errors, 'add the member');
 }
 
 $page_title = 'Add a member';

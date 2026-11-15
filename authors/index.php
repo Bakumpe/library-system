@@ -1,43 +1,24 @@
 <?php
-// Worked example of the page pattern. Copy this shape for the other lists:
-// auth check, handle POST, validate on the server, prepared statements,
-// flash a message, redirect, then query and print with e().
 require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/author_form.php';
 
 $errors = [];
-$name = '';
-$country = '';
+$form = AUTHOR_BLANK;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
-
-    $name    = post_text('name');
-    $country = post_text('country');
-
-    $errors = array_filter([
-        validate_required($name, 'Name', 120),
-        validate_required($country, 'Country', 80),
-    ]);
-
+    $form = author_form_input();
+    $errors = author_form_errors($form) ?: save_author($pdo, $form);
     if (!$errors) {
-        try {
-            $stmt = $pdo->prepare('INSERT INTO authors (name, country) VALUES (?, ?)');
-            $stmt->execute([$name, $country]);
-            flash('success', 'Author added successfully.');
-            redirect('authors/index.php');
-        } catch (PDOException $e) {
-            if (is_duplicate_error($e)) {
-                $errors[] = 'That author is already on the list.';
-            } else {
-                error_log($e->getMessage());
-                $errors[] = 'The author could not be saved. Please try again.';
-            }
-        }
+        flash('success', $form['name'] . ' added.');
+        redirect('authors/index.php');
     }
+    flash_form_errors($errors, 'add the author');
 }
 
-$search = trim((string) ($_GET['q'] ?? ''));
+$search = get_text('q');
+$like = '%' . $search . '%';
 $stmt = $pdo->prepare(
     'SELECT a.author_id, a.name, a.country, COUNT(b.book_id) AS titles
      FROM authors a
@@ -46,7 +27,6 @@ $stmt = $pdo->prepare(
      GROUP BY a.author_id, a.name, a.country
      ORDER BY a.name'
 );
-$like = '%' . $search . '%';
 $stmt->execute([$like, $like]);
 $authors = $stmt->fetchAll();
 
@@ -70,31 +50,23 @@ require __DIR__ . '/../includes/header.php';
                 <td><?= e($author['name']) ?></td>
                 <td><?= e($author['country']) ?></td>
                 <td class="num"><?= e($author['titles']) ?></td>
-                <td>
-                    <a href="<?= e(url('authors/edit.php?id=' . (int) $author['author_id'])) ?>">Edit</a>
-                    <a href="<?= e(url('authors/delete.php?id=' . (int) $author['author_id'])) ?>">Delete</a>
+                <td class="row-actions">
+                    <?= edit_link('authors', (int) $author['author_id']) ?>
+                    <?= delete_link('authors', (int) $author['author_id']) ?>
                 </td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$authors) : ?>
-            <tr><td colspan="4">No authors match that search.</td></tr>
+            <?= empty_row(4, 'No authors match that search.') ?>
         <?php endif; ?>
         </tbody>
     </table>
 </div>
 
 <h2>Add an author</h2>
-<?php foreach ($errors as $error) : ?>
-    <p class="flash flash--error" role="alert"><?= e($error) ?></p>
-<?php endforeach; ?>
-<form method="post" class="form">
+<form method="post" class="form" data-busy-form>
     <?= csrf_field() ?>
-    <label for="name">Name</label>
-    <input id="name" name="name" value="<?= e($name) ?>" maxlength="120" required>
-
-    <label for="country">Country</label>
-    <input id="country" name="country" value="<?= e($country) ?>" maxlength="80" required>
-
-    <button class="btn" type="submit">Add author</button>
+    <?= author_fields($form, $errors) ?>
+    <button class="btn" type="submit" data-busy-label="Saving…">Add author</button>
 </form>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

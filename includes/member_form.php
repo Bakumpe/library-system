@@ -3,6 +3,7 @@
 // The add and edit member pages share this: reading the form, checking it, and drawing the fields.
 
 const MEMBER_STATUSES = ['active' => 'Active', 'suspended' => 'Suspended'];
+const MEMBER_BLANK = ['member_number' => '', 'full_name' => '', 'email' => '', 'phone' => '', 'status' => 'active'];
 
 /**
  * The posted member fields, trimmed. Member numbers are stored in capitals and emails in lowercase.
@@ -58,6 +59,16 @@ function member_form_errors(PDO $pdo, array $form, int $member_id = 0): array
     }
 
     return $errors;
+}
+
+/**
+ * The values both INSERT and UPDATE write, in this order: member_number, full_name, email, phone, status.
+ *
+ * @param array<string, string> $form
+ */
+function member_values(array $form): array
+{
+    return [$form['member_number'], $form['full_name'], $form['email'], $form['phone'], $form['status']];
 }
 
 /** The field a UNIQUE error from the members table is about, with its message. */

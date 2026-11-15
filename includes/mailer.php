@@ -91,6 +91,9 @@ function send_code(PDO $pdo, array $user, string $purpose): array
  */
 function check_code(PDO $pdo, int $user_id, string $purpose, string $code): ?string
 {
+    if (strlen($code) !== 6) {
+        return 'Enter the 6 digits from the email.';
+    }
     $stmt = $pdo->prepare(
         'SELECT code_hash, code_attempts, code_expires_at > NOW() AS fresh
          FROM users WHERE user_id = ? AND code_purpose = ?'

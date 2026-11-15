@@ -10,11 +10,10 @@ if ($user_id === 0) {
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/mailer.php';
+require_once __DIR__ . '/../includes/auth_form.php';
 
-$stmt = $pdo->prepare('SELECT user_id, email, full_name, role, email_verified_at FROM users WHERE user_id = ?');
-$stmt->execute([$user_id]);
-$user = $stmt->fetch();
-if (!$user || $user['email_verified_at'] !== null) {
+$user = fetch_row($pdo, 'SELECT user_id, email, full_name, role, email_verified_at FROM users WHERE user_id = ?', [$user_id]);
+if ($user === null || $user['email_verified_at'] !== null) {
     unset($_SESSION['verify_user_id']);
     if ($user) {
         flash('info', 'Your email is already confirmed. Log in to continue.');
@@ -33,8 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('auth/verify_email.php');
     }
 
-    $code = preg_replace('/\D/', '', post_text('code')) ?? '';
-    $error = strlen($code) !== 6 ? 'Enter the 6 digits from the email.' : check_code($pdo, $user_id, 'verify', $code);
+    $error = check_code($pdo, $user_id, 'verify', post_code());
     if ($error === null) {
         $pdo->prepare('UPDATE users SET email_verified_at = NOW() WHERE user_id = ?')->execute([$user_id]);
         unset($_SESSION['verify_user_id']);
@@ -59,12 +57,7 @@ require __DIR__ . '/../includes/header.php';
 
         <form method="post" class="auth__form" data-busy-form>
             <?= csrf_field() ?>
-            <div class="field">
-                <label for="code">Confirmation code</label>
-                <input id="code" name="code" class="field__code" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7"
-                    placeholder="000 000" autocomplete="one-time-code" required autofocus<?= field_attrs($errors, 'code') ?>>
-                <?= field_error($errors, 'code') ?>
-            </div>
+            <?= code_field($errors, 'Confirmation code') ?>
             <button class="btn btn--block" type="submit" data-busy-label="Checking…">Confirm email</button>
         </form>
 

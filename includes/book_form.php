@@ -2,6 +2,11 @@
 
 // The add and edit book pages share this: reading the form, checking it, and the ISBN rules.
 
+const BOOK_BLANK = [
+    'isbn' => '', 'title' => '', 'author_id' => '', 'category_id' => '',
+    'publisher' => '', 'year_published' => '', 'total_copies' => '1',
+];
+
 /**
  * Removes spaces and dashes, so 978-0-385-47454-2 and 9780385474542 are stored the same way.
  */
@@ -56,6 +61,19 @@ function book_form_input(): array
         'publisher'      => post_text('publisher'),
         'year_published' => post_text('year_published'),
         'total_copies'   => post_text('total_copies'),
+    ];
+}
+
+/**
+ * The values both INSERT and UPDATE write, in this order: isbn, title, author_id, category_id, publisher, year_published.
+ *
+ * @param array<string, string> $form
+ */
+function book_values(array $form): array
+{
+    return [
+        $form['isbn'], $form['title'], (int) $form['author_id'], (int) $form['category_id'],
+        $form['publisher'], (int) $form['year_published'],
     ];
 }
 

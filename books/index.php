@@ -1,28 +1,35 @@
 <?php
 require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/reports.php';
 
-$search = trim((string) ($_GET['q'] ?? ''));
-$author_id = (int) ($_GET['author_id'] ?? 0);
-$category_id = (int) ($_GET['category_id'] ?? 0);
+$search = get_text('q');
+$author_id = (int) get_text('author_id');
+$category_id = (int) get_text('category_id');
 
 $authors = author_choices($pdo);
 $categories = category_choices($pdo);
 
 // Each filter is skipped when it is empty (0 or ''), so one query covers every combination.
-$stmt = $pdo->prepare(
-    'SELECT b.book_id, b.isbn, b.title, b.publisher, b.year_published, b.total_copies, b.available_copies,
-            a.name AS author_name, c.name AS category_name
-     FROM books b
-     JOIN authors a ON a.author_id = b.author_id
-     JOIN categories c ON c.category_id = b.category_id
-     WHERE (? = \'\' OR b.title LIKE ?)
-       AND (? = 0 OR b.author_id = ?)
-       AND (? = 0 OR b.category_id = ?)
-     ORDER BY b.title'
-);
-$stmt->execute([$search, '%' . $search . '%', $author_id, $author_id, $category_id, $category_id]);
-$books = $stmt->fetchAll();
+$from = ' FROM books b
+          JOIN authors a ON a.author_id = b.author_id
+          JOIN categories c ON c.category_id = b.category_id
+          WHERE (? = \'\' OR b.title LIKE ?)
+            AND (? = 0 OR b.author_id = ?)
+            AND (? = 0 OR b.category_id = ?)';
+$params = [$search, '%' . $search . '%', $author_id, $author_id, $category_id, $category_id];
+$select = 'SELECT b.book_id, b.isbn, b.title, b.publisher, b.year_published, b.total_copies, b.available_copies,
+                  a.name AS author_name, c.name AS category_name' . $from . ' ORDER BY b.title';
+
+if (wants_csv()) {
+    export_csv($pdo, $select, $params, 'books', ['Title', 'Author', 'Category', 'ISBN', 'Publisher', 'Year', 'Total copies', 'On shelf'], fn (array $book) => [
+        $book['title'], $book['author_name'], $book['category_name'], $book['isbn'], $book['publisher'],
+        $book['year_published'], $book['total_copies'], $book['available_copies'],
+    ]);
+}
+
+$pages = paginate(count_rows($pdo, $from, $params));
+$books = fetch_page($pdo, $select, $params, $pages);
 
 $filtered = $search !== '' || $author_id > 0 || $category_id > 0;
 
@@ -47,15 +54,15 @@ require __DIR__ . '/../includes/header.php';
         <label for="category_id">Category</label>
         <select id="category_id" name="category_id"><?= select_options($categories, $category_id, 'All categories') ?></select>
     </div>
-    <div class="search__actions">
-        <button class="btn btn--quiet" type="submit">Search</button>
-        <?php if ($filtered) : ?>
-            <a href="<?= e(url('books/index.php')) ?>">Clear</a>
-        <?php endif; ?>
-    </div>
+    <?= search_actions($filtered, 'books/index.php') ?>
 </form>
 
-<p><?= count($books) ?> <?= count($books) === 1 ? 'book' : 'books' ?><?= $filtered ? ' match' . (count($books) === 1 ? 'es' : '') . ' these filters' : ' in the catalogue' ?>.</p>
+<div class="list-head">
+    <p><?= list_count($pages['total'], 'book', 'books', $filtered, ' in the catalogue') ?></p>
+    <?php if ($books) : ?>
+        <?= csv_link() ?>
+    <?php endif; ?>
+</div>
 
 <div class="table-scroll">
     <table>
@@ -86,16 +93,17 @@ require __DIR__ . '/../includes/header.php';
                         <br><span class="pill pill--out"><?= $out ?> on loan</span>
                     <?php endif; ?>
                 </td>
-                <td>
-                    <a href="<?= e(url('books/edit.php?id=' . (int) $book['book_id'])) ?>">Edit</a>
-                    <a href="<?= e(url('books/delete.php?id=' . (int) $book['book_id'])) ?>">Delete</a>
+                <td class="row-actions">
+                    <?= edit_link('books', (int) $book['book_id']) ?>
+                    <?= delete_link('books', (int) $book['book_id']) ?>
                 </td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$books) : ?>
-            <tr><td colspan="6"><?= $filtered ? 'No books match these filters.' : 'No books yet. Add the first one.' ?></td></tr>
+            <?= empty_row(6, $filtered ? 'No books match these filters.' : 'No books yet. Add the first one.') ?>
         <?php endif; ?>
         </tbody>
     </table>
 </div>
+<?= pagination_nav($pages) ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
