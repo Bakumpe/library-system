@@ -4,3 +4,6 @@
 
 # Settings for this computer, including the Resend API key. Copy .env.example to start.
 /.env
+
+# A local copy of Composer; install it globally instead (see README)
+/composer.phar
