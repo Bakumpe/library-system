@@ -8,15 +8,8 @@ require_once __DIR__ . '/../config/database.php';
  */
 function return_loan(PDO $pdo, int $loan_id): ?string
 {
-    $stmt = $pdo->prepare(
-        'SELECT loan_id, book_id, date_returned
-         FROM loans
-         WHERE loan_id = ?
-         FOR UPDATE'
-    );
-    $stmt->execute([$loan_id]);
-    $loan = $stmt->fetch();
-    if (!$loan) {
+    $loan = fetch_row($pdo, 'SELECT book_id, date_returned FROM loans WHERE loan_id = ? FOR UPDATE', [$loan_id]);
+    if ($loan === null) {
         return 'That loan could not be found.';
     }
     if ($loan['date_returned'] !== null) {
@@ -24,83 +17,57 @@ function return_loan(PDO $pdo, int $loan_id): ?string
     }
 
     $stmt = $pdo->prepare(
-        'UPDATE books
-         SET available_copies = available_copies + 1
-         WHERE book_id = ?
-           AND available_copies < total_copies'
+        'UPDATE books SET available_copies = available_copies + 1 WHERE book_id = ? AND available_copies < total_copies'
     );
     $stmt->execute([(int) $loan['book_id']]);
     if ($stmt->rowCount() !== 1) {
         return 'The book copy count is already at its limit; the return was not recorded.';
     }
 
-    $stmt = $pdo->prepare(
-        'UPDATE loans
-         SET date_returned = CURDATE()
-         WHERE loan_id = ? AND date_returned IS NULL'
-    );
-    $stmt->execute([$loan_id]);
-    if ($stmt->rowCount() !== 1) {
-        return 'This loan has already been returned.';
-    }
-
+    $pdo->prepare('UPDATE loans SET date_returned = CURDATE() WHERE loan_id = ?')->execute([$loan_id]);
     return null;
 }
 
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
+    $loan_id = post_id('loan_id');
 
-    $loan_id = is_string($_POST['loan_id'] ?? null) ? $_POST['loan_id'] : '';
-    if (!ctype_digit($loan_id) || (int) $loan_id < 1) {
+    if ($loan_id === 0) {
         $error = 'Choose a valid loan to return.';
     } else {
-        try {
-            // One transaction: the loan is closed and the copy goes back on the shelf together, or neither happens.
-            $pdo->beginTransaction();
-            $error = return_loan($pdo, (int) $loan_id);
+        // One transaction: the loan is closed and the copy goes back on the shelf together, or neither happens.
+        // If the database fails midway, PHP ends the request and MySQL undoes the open transaction.
+        $pdo->beginTransaction();
+        $error = return_loan($pdo, $loan_id);
 
-            if ($error === null) {
-                $pdo->commit();
-
-                // Show the copy count going back up.
-                $stmt = $pdo->prepare(
-                    'SELECT b.title, b.available_copies, b.total_copies
-                     FROM loans l JOIN books b ON b.book_id = l.book_id
-                     WHERE l.loan_id = ?'
-                );
-                $stmt->execute([(int) $loan_id]);
-                $book = $stmt->fetch();
-                flash('success', sprintf(
-                    'Book return recorded. "%s" now has %d of %d copies on the shelf.',
-                    $book['title'],
-                    $book['available_copies'],
-                    $book['total_copies']
-                ));
-                redirect('loans/index.php');
-            }
-
-            $pdo->rollBack();
-        } catch (PDOException $exception) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            error_log('Loan return failed: ' . $exception->getMessage());
-            $error = 'The book could not be returned because of a database error. Please try again.';
+        if ($error === null) {
+            $pdo->commit();
+            $book = fetch_row(
+                $pdo,
+                'SELECT b.title, b.available_copies, b.total_copies FROM loans l JOIN books b ON b.book_id = l.book_id WHERE l.loan_id = ?',
+                [$loan_id]
+            );
+            flash('success', sprintf(
+                'Book return recorded. "%s" now has %d of %d copies on the shelf.',
+                $book['title'],
+                $book['available_copies'],
+                $book['total_copies']
+            ));
+            redirect('loans/index.php');
         }
+        $pdo->rollBack();
     }
 }
 
-$stmt = $pdo->query(
-    'SELECT l.loan_id, l.date_issued, l.due_date,
-            b.title, m.member_number, m.full_name
+$loans = $pdo->query(
+    'SELECT l.loan_id, l.date_issued, l.due_date, b.title, m.member_number, m.full_name
      FROM loans l
      JOIN books b ON b.book_id = l.book_id
      JOIN members m ON m.member_id = l.member_id
      WHERE l.date_returned IS NULL
      ORDER BY l.due_date, m.full_name, b.title'
-);
-$loans = $stmt->fetchAll();
+)->fetchAll();
 
 if ($error !== null) {
     flash_now('error', $error);
@@ -111,37 +78,28 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <h1>Return a book</h1>
 
-
-<?php if ($loans === []) : ?>
-    <p>There are no books currently on loan.</p>
+<?php if (!$loans) : ?>
+    <p>There are no books on loan right now.</p>
 <?php else : ?>
     <div class="table-scroll">
         <table>
-            <thead>
-                <tr>
-                    <th>Member</th>
-                    <th>Book</th>
-                    <th>Issued</th>
-                    <th>Due</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
+            <thead><tr><th>Member</th><th>Book</th><th>Issued</th><th>Due</th><th>Action</th></tr></thead>
             <tbody>
-                <?php foreach ($loans as $loan) : ?>
-                    <tr>
-                        <td><?= e($loan['full_name']) ?> (<?= e($loan['member_number']) ?>)</td>
-                        <td><?= e($loan['title']) ?></td>
-                        <td><?= e($loan['date_issued']) ?></td>
-                        <td><?= e($loan['due_date']) ?></td>
-                        <td>
-                            <form method="post" data-confirm="Record the return of <?= e($loan['title']) ?> from <?= e($loan['full_name']) ?>?">
-                                <?= csrf_field() ?>
-                                <input type="hidden" name="loan_id" value="<?= e($loan['loan_id']) ?>">
-                                <button class="btn" type="submit">Record return</button>
-                            </form>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
+            <?php foreach ($loans as $loan) : ?>
+                <tr>
+                    <td><?= e($loan['full_name']) ?> (<?= e($loan['member_number']) ?>)</td>
+                    <td><?= e($loan['title']) ?></td>
+                    <td class="nowrap"><?= e($loan['date_issued']) ?></td>
+                    <td class="nowrap"><?= e($loan['due_date']) ?></td>
+                    <td>
+                        <form method="post" data-busy-form data-confirm="<?= e('Record the return of ' . $loan['title'] . ' from ' . $loan['full_name'] . '?') ?>">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="loan_id" value="<?= (int) $loan['loan_id'] ?>">
+                            <button class="btn" type="submit" data-busy-label="Saving…">Record return</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
             </tbody>
         </table>
     </div>

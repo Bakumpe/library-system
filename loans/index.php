@@ -4,18 +4,16 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/reports.php';
 
 $statuses = ['out' => 'Out', 'returned' => 'Returned', 'overdue' => 'Overdue'];
-$status = is_string($_GET['status'] ?? null) && isset($statuses[$_GET['status']]) ? $_GET['status'] : '';
-$search = is_string($_GET['search'] ?? null) ? trim($_GET['search']) : '';
+$status = get_choice('status', $statuses);
+$search = get_text('search');
 
-$conditions = [];
+$status_sql = [
+    'out'      => 'l.date_returned IS NULL AND l.due_date >= CURDATE()',
+    'returned' => 'l.date_returned IS NOT NULL',
+    'overdue'  => OVERDUE_SQL,
+];
+$conditions = $status !== '' ? [$status_sql[$status]] : [];
 $params = [];
-if ($status === 'out') {
-    $conditions[] = 'l.date_returned IS NULL AND l.due_date >= CURDATE()';
-} elseif ($status === 'returned') {
-    $conditions[] = 'l.date_returned IS NOT NULL';
-} elseif ($status === 'overdue') {
-    $conditions[] = 'l.date_returned IS NULL AND l.due_date < CURDATE()';
-}
 if ($search !== '') {
     $conditions[] = '(m.full_name LIKE ? OR m.member_number LIKE ?)';
     $params[] = '%' . $search . '%';
@@ -28,8 +26,8 @@ $from = ' FROM loans l
     . ($conditions ? ' WHERE ' . implode(' AND ', $conditions) : '');
 
 // Open loans first, the most urgent due date at the top.
-$select = 'SELECT l.loan_id, l.date_issued, l.due_date, l.date_returned, ' . days_late_sql() . ' AS days_late,
-                  l.date_returned IS NULL AND l.due_date < CURDATE() AS is_overdue,
+$select = 'SELECT l.loan_id, l.date_issued, l.due_date, l.date_returned, ' . DAYS_LATE_SQL . ' AS days_late,
+                  ' . OVERDUE_SQL . ' AS is_overdue,
                   b.title, m.member_number, m.full_name'
     . $from . ' ORDER BY l.date_returned IS NULL DESC, l.due_date, m.full_name, b.title';
 
@@ -43,16 +41,10 @@ function loan_status(array $loan): string
 }
 
 if (wants_csv()) {
-    $stmt = $pdo->prepare($select); // $select holds only ? placeholders.
-    $stmt->execute($params);
-    $rows = [];
-    foreach ($stmt as $loan) {
-        $rows[] = [
-            $loan['full_name'], $loan['member_number'], $loan['title'], $loan['date_issued'], $loan['due_date'],
-            $loan['date_returned'] ?? '', ucfirst(loan_status($loan)), $loan['days_late'], fine_for((int) $loan['days_late']),
-        ];
-    }
-    send_csv('loans', ['Member', 'Member number', 'Book', 'Issued', 'Due', 'Returned', 'Status', 'Days late', 'Fine (UGX)'], $rows);
+    export_csv($pdo, $select, $params, 'loans', ['Member', 'Member number', 'Book', 'Issued', 'Due', 'Returned', 'Status', 'Days late', 'Fine (UGX)'], fn (array $loan) => [
+        $loan['full_name'], $loan['member_number'], $loan['title'], $loan['date_issued'], $loan['due_date'],
+        $loan['date_returned'] ?? '', $statuses[loan_status($loan)], $loan['days_late'], fine_for((int) $loan['days_late']),
+    ]);
 }
 
 $pages = paginate(count_rows($pdo, $from, $params));
@@ -81,16 +73,11 @@ require __DIR__ . '/../includes/header.php';
         <label for="status">Status</label>
         <select id="status" name="status"><?= select_options($statuses, $status, 'All loans') ?></select>
     </div>
-    <div class="search__actions">
-        <button class="btn btn--quiet" type="submit">Search</button>
-        <?php if ($filtered) : ?>
-            <a href="<?= e(url('loans/index.php')) ?>">Clear</a>
-        <?php endif; ?>
-    </div>
+    <?= search_actions($filtered, 'loans/index.php') ?>
 </form>
 
 <div class="list-head">
-    <p><?= $pages['total'] ?> <?= $pages['total'] === 1 ? 'loan' : 'loans' ?><?= $filtered ? ' match these filters' : '' ?>.
+    <p><?= list_count($pages['total'], 'loan', 'loans', $filtered) ?>
         Late books cost <?= e(money(FINE_PER_DAY)) ?> a day.</p>
     <?php if ($loans) : ?>
         <?= csv_link() ?>
@@ -121,11 +108,11 @@ require __DIR__ . '/../includes/header.php';
                 <td class="nowrap"><?= e($loan['due_date']) ?></td>
                 <td class="nowrap"><?= e($loan['date_returned'] ?? '-') ?></td>
                 <td><span class="pill <?= $pills[$state] ?>"><?= e($statuses[$state]) ?></span></td>
-                <td class="num"><?= $fine > 0 ? e(money($fine)) . '<br><small>' . e($loan['days_late']) . ' days late</small>' : '-' ?></td>
+                <td class="num"><?= $fine > 0 ? e(money($fine)) . '<br><small>' . e(plural((int) $loan['days_late'], 'day', 'days')) . ' late</small>' : '-' ?></td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$loans) : ?>
-            <tr><td colspan="7"><?= $filtered ? 'No loans match these filters.' : 'No loans yet. Issue the first book.' ?></td></tr>
+            <?= empty_row(7, $filtered ? 'No loans match these filters.' : 'No loans yet. Issue the first book.') ?>
         <?php endif; ?>
         </tbody>
     </table>

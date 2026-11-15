@@ -17,7 +17,8 @@
         "code:check": "bash .github/scripts/check-all.sh",
         "code:check:full": "bash .github/scripts/check-all.sh --full",
         "code:fix": "bash .github/scripts/check-all.sh --fix",
-        "hooks:install": "git config core.hooksPath .github/hooks"
+        "hooks:install": "git config core.hooksPath .github/hooks",
+        "package": "bash .github/scripts/package.sh"
     },
     "scripts-descriptions": {
         "dev:doctor": "Check PHP, MySQL, the database and Apache, and print a fix for anything missing",
@@ -27,6 +28,7 @@
         "code:check": "Run the code checks GitHub runs",
         "code:check:full": "Code checks plus the database import and app smoke test",
         "code:fix": "Fix PHP code style automatically",
-        "hooks:install": "Run the code checks before every git push"
+        "hooks:install": "Run the code checks before every git push",
+        "package": "Build LMS_<group name>.zip for submission, laid out exactly as the brief asks"
     }
 }

@@ -2,18 +2,14 @@
 
 // Fines, pagination and CSV export, shared by the dashboard and the list pages.
 
-// Fines are worked out from the dates, not stored: see docs/fines.md for why.
-const FINE_PER_DAY = 500; // Uganda shillings for each day a book is late.
+// Fines are worked out from the dates, not stored: see docs/fines.md.
+const FINE_PER_DAY = 500; // UGX per day late
 const PER_PAGE = 20;
 
-/**
- * SQL for the days a loan is late: up to today while it is out, up to the return date once it is back.
- * Never below zero. Use it with the loans table aliased as l.
- */
-function days_late_sql(): string
-{
-    return 'GREATEST(DATEDIFF(COALESCE(l.date_returned, CURDATE()), l.due_date), 0)';
-}
+// SQL pieces for the loans table aliased as l.
+// Days late: to today while the book is out, to the return date once it is back, never below 0.
+const DAYS_LATE_SQL = 'GREATEST(DATEDIFF(COALESCE(l.date_returned, CURDATE()), l.due_date), 0)';
+const OVERDUE_SQL = '(l.date_returned IS NULL AND l.due_date < CURDATE())';
 
 /** The fine for a number of late days. */
 function fine_for(int $days_late): int
@@ -99,6 +95,19 @@ function pagination_nav(array $p): string
     return $html . '</nav>';
 }
 
+/** The line above a list: "12 books in the catalogue." or "1 book matches these filters." */
+function list_count(int $total, string $one, string $many, bool $filtered, string $otherwise = ''): string
+{
+    return plural($total, $one, $many) . ($filtered ? ($total === 1 ? ' matches' : ' match') . ' these filters' : $otherwise) . '.';
+}
+
+/** The Search button of a filter form, and a Clear link back to $list while a filter is on. */
+function search_actions(bool $filtered, string $list): string
+{
+    return '<div class="search__actions"><button class="btn btn--quiet" type="submit">Search</button>'
+        . ($filtered ? '<a href="' . e(url($list)) . '">Clear</a>' : '') . '</div>';
+}
+
 /** True when the list was asked for as a CSV file (?export=csv). */
 function wants_csv(): bool
 {
@@ -134,6 +143,18 @@ function send_csv(string $name, array $header, iterable $rows): never
     }
     fclose($out);
     exit;
+}
+
+/**
+ * Run a list's query without paging and send every row as a CSV download. $cells turns one row into its cells.
+ *
+ * @param list<string> $header
+ */
+function export_csv(PDO $pdo, string $select, array $params, string $name, array $header, callable $cells): never
+{
+    $stmt = $pdo->prepare($select);
+    $stmt->execute($params);
+    send_csv($name, $header, array_map($cells, $stmt->fetchAll()));
 }
 
 /**

@@ -1,55 +1,37 @@
-# Database design and normalization
+# Database design
 
-## Final entity-relationship diagram
+![ERD](../database/erd.png)
 
-![Final library database ERD](../database/erd.png)
+Six tables. An author writes many books and a category holds many books. A member has many loans, and each loan
+is one member borrowing one book. `users` are staff logins, not library members, so they stand alone.
 
-The schema contains six entities. An author writes many books, a category
-classifies many books, and a member can have many loan records. Each loan
-references one member and one book. User accounts are independent of member
-records because they are staff login accounts, not library patrons.
+A member can only have one open loan of the same book. `loans.open_loan_guard` is 1 while a loan is open and NULL
+once it is returned, and there is a UNIQUE key on `(book_id, member_id, open_loan_guard)`. MariaDB allows many
+NULLs in a unique key, so returned loans stay in the history and the book can be borrowed again later.
 
-The database also enforces a business rule on `loans`: a member may have only
-one open loan for a particular book at a time. The generated
-`open_loan_guard` column is `1` for an open loan and `NULL` for a returned loan.
-The unique key on `(book_id, member_id, open_loan_guard)` rejects a second open
-loan while allowing any number of returned loan-history records for the same
-member and book.
+## Normal forms
 
-## First, second, and third normal forms
+- **1NF:** every table has a primary key and one value per column. A book's loans are rows in `loans`, not a list.
+- **2NF:** every primary key is a single column, so nothing can depend on part of a key.
+- **3NF:** no column depends on another non-key column. `books` stores `author_id`, not the author's name.
+  `loans` stores `member_id`, not the member's phone.
 
-- **1NF:** Each table has a primary key and stores one value per column; lists
-  such as multiple authors or multiple loans are represented by related rows,
-  not repeating columns.
-- **2NF:** Every table uses a single-column primary key, so non-key attributes
-  depend on the whole primary key. The composite unique key on
-  `authors(name, country)` is an alternate candidate key; no non-key attribute
-  depends on only part of it.
-- **3NF:** Non-key attributes describe their table's key, not another
-  non-key attribute. Descriptive author and category data live in their own
-  tables rather than being repeated in `books`; member details are not copied
-  into `loans`; and login details are isolated in `users`.
+## Tables
 
-## Table-by-table justification
+| Table | Keys | Why it is in 3NF |
+|---|---|---|
+| `authors` | PK `author_id`, UNIQUE (`name`, `country`) | Name and country describe the author only. |
+| `categories` | PK `category_id`, UNIQUE `name` | Stored once, books point to it. |
+| `books` | PK `book_id`, UNIQUE `isbn`, FK `author_id`, `category_id` | Only facts about the book. Author and category details stay in their tables. |
+| `members` | PK `member_id`, UNIQUE `member_number`, `email` | Contact details and status describe the member only. |
+| `loans` | PK `loan_id`, FK `member_id`, `book_id` | The dates describe one loan. Member and book details are not copied. |
+| `users` | PK `user_id`, UNIQUE `username`, `email` | Login details only. A user has at most one emailed code waiting, so its `code_*` columns sit here. Only a hash of the code is kept. |
 
-| Table | Keys and attributes | 3NF justification |
-| --- | --- | --- |
-| `authors` | `author_id` primary key; `name` and `country`; unique (`name`, `country`). | An author's name and country describe the author identified by `author_id`. The alternate unique key prevents duplicate author identities without storing author details in each book row. |
-| `categories` | `category_id` primary key; unique `name`; optional `description`. | The category name and description depend on the category key. Category data are stored once and referenced from books. |
-| `books` | `book_id` primary key; unique `isbn`; author and category foreign keys; title, publisher, publication year, total and available copies. | Book-specific attributes depend on the book key (with ISBN as an alternate key). Author and category descriptions are not stored here, avoiding transitive dependencies through their foreign keys. |
-| `members` | `member_id` primary key; unique `member_number` and `email`; name, phone, status and join date. | Patron attributes depend on the member key. Loans reference the member rather than duplicating their personal details. |
-| `loans` | `loan_id` primary key; member and book foreign keys; issue, due and return dates; generated open-loan guard. | Dates and the guard describe one loan. Member and book details remain in their parent tables. The guard is derived solely from `date_returned`, and its unique key enforces the one-open-loan rule while permitting multiple returned history rows. |
-| `users` | `user_id` primary key; unique `username` and `email`; password hash, `email_verified_at`, full name, role (`admin` or `librarian`), and the `code_*` columns for the one emailed code. | Every column depends on the user key alone. A user has at most one code waiting, so its purpose, hash, expiry, send time and attempt count describe that user and need no separate table. Only the code's hash is stored. Staff accounts stay separate from patron records because they serve different purposes. |
-
-`available_copies` is stored on `books` as an operational inventory counter so
-issuing and returning can update it transactionally. It is expected to equal
-`total_copies` minus the number of open loan rows; the database check script
-verifies that invariant against the sample data. Application loan and return
-operations must continue to update the counter and loan row together.
+`books.available_copies` is a counter kept for speed. It should always equal `total_copies` minus the open loans.
+Issuing and returning change the counter and the loan in one transaction, and `check-database.sh` checks that
+the sample data agrees.
 
 ## Report queries
 
-`database/queries.sql` contains four report queries: current loans by member,
-loan totals by category, overdue loans with days overdue and phone number, and
-every book with its author, category, and copies out. The category totals query
-is the aggregate report; the other queries use joins to combine related data.
+`database/queries.sql` has four: open loans by member, loans per category (the GROUP BY report), overdue loans
+with days late and phone numbers, and every book with its author, category and copies out.

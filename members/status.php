@@ -3,29 +3,28 @@
 // Suspend or reactivate a member from the list. POST only: it changes data.
 require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/member_form.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect('members/index.php');
 }
 require_csrf();
 
-$member_id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+$member_id = post_id('id');
 $status = post_text('status');
-$back = 'members/index.php' . (str_starts_with(post_text('back'), '?') ? post_text('back') : '');
+$filters = post_text('back'); // The list's ?query, so the user lands on the same page and filters.
+$back = 'members/index.php' . (str_starts_with($filters, '?') ? $filters : '');
 
-if (!$member_id || !in_array($status, ['active', 'suspended'], true)) {
+if ($member_id === 0 || !isset(MEMBER_STATUSES[$status])) {
     flash('error', 'Choose a member and a status.');
     redirect('members/index.php');
 }
 
-$stmt = $pdo->prepare('UPDATE members SET status = ? WHERE member_id = ?');
-$stmt->execute([$status, $member_id]);
+$pdo->prepare('UPDATE members SET status = ? WHERE member_id = ?')->execute([$status, $member_id]);
+$member = fetch_row($pdo, 'SELECT full_name FROM members WHERE member_id = ?', [$member_id]);
+$full_name = $member['full_name'] ?? null;
 
-$name = $pdo->prepare('SELECT full_name FROM members WHERE member_id = ?');
-$name->execute([$member_id]);
-$full_name = $name->fetchColumn();
-
-if ($full_name === false) {
+if ($full_name === null) {
     flash('error', 'That member is not on the list.');
 } elseif ($status === 'suspended') {
     flash('success', $full_name . ' is suspended and cannot borrow books until reactivated.');

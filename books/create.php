@@ -7,15 +7,7 @@ $authors = author_choices($pdo);
 $categories = category_choices($pdo);
 
 $errors = [];
-$form = [
-    'isbn' => '',
-    'title' => '',
-    'author_id' => '',
-    'category_id' => '',
-    'publisher' => '',
-    'year_published' => '',
-    'total_copies' => '1',
-];
+$form = BOOK_BLANK;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
@@ -25,33 +17,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$errors) {
         try {
             // A new book has every copy on the shelf.
+            $copies = (int) $form['total_copies'];
             $stmt = $pdo->prepare(
                 'INSERT INTO books (isbn, title, author_id, category_id, publisher, year_published, total_copies, available_copies)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $stmt->execute([
-                $form['isbn'],
-                $form['title'],
-                (int) $form['author_id'],
-                (int) $form['category_id'],
-                $form['publisher'],
-                (int) $form['year_published'],
-                (int) $form['total_copies'],
-                (int) $form['total_copies'],
-            ]);
+            $stmt->execute([...book_values($form), $copies, $copies]);
 
             flash('success', '"' . $form['title'] . '" added to the catalogue.');
             redirect('books/index.php');
         } catch (PDOException $e) {
             if (!is_duplicate_error($e)) {
-                error_log('Book insert failed: ' . $e->getMessage());
                 throw $e;
             }
             $errors['isbn'] = 'Another book already has that ISBN.';
         }
     }
-
-    flash_now('error', count($errors) === 1 ? 'Fix the highlighted field to save the book.' : 'Fix the ' . count($errors) . ' highlighted fields to save the book.');
+    flash_form_errors($errors, 'save the book');
 }
 
 $page_title = 'Add a book';

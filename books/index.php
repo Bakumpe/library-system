@@ -3,9 +3,9 @@ require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/reports.php';
 
-$search = trim((string) ($_GET['q'] ?? ''));
-$author_id = (int) ($_GET['author_id'] ?? 0);
-$category_id = (int) ($_GET['category_id'] ?? 0);
+$search = get_text('q');
+$author_id = (int) get_text('author_id');
+$category_id = (int) get_text('category_id');
 
 $authors = author_choices($pdo);
 $categories = category_choices($pdo);
@@ -22,16 +22,10 @@ $select = 'SELECT b.book_id, b.isbn, b.title, b.publisher, b.year_published, b.t
                   a.name AS author_name, c.name AS category_name' . $from . ' ORDER BY b.title';
 
 if (wants_csv()) {
-    $stmt = $pdo->prepare($select); // $select holds only ? placeholders.
-    $stmt->execute($params);
-    $rows = [];
-    foreach ($stmt as $book) {
-        $rows[] = [
-            $book['title'], $book['author_name'], $book['category_name'], $book['isbn'], $book['publisher'],
-            $book['year_published'], $book['total_copies'], $book['available_copies'],
-        ];
-    }
-    send_csv('books', ['Title', 'Author', 'Category', 'ISBN', 'Publisher', 'Year', 'Total copies', 'On shelf'], $rows);
+    export_csv($pdo, $select, $params, 'books', ['Title', 'Author', 'Category', 'ISBN', 'Publisher', 'Year', 'Total copies', 'On shelf'], fn (array $book) => [
+        $book['title'], $book['author_name'], $book['category_name'], $book['isbn'], $book['publisher'],
+        $book['year_published'], $book['total_copies'], $book['available_copies'],
+    ]);
 }
 
 $pages = paginate(count_rows($pdo, $from, $params));
@@ -60,16 +54,11 @@ require __DIR__ . '/../includes/header.php';
         <label for="category_id">Category</label>
         <select id="category_id" name="category_id"><?= select_options($categories, $category_id, 'All categories') ?></select>
     </div>
-    <div class="search__actions">
-        <button class="btn btn--quiet" type="submit">Search</button>
-        <?php if ($filtered) : ?>
-            <a href="<?= e(url('books/index.php')) ?>">Clear</a>
-        <?php endif; ?>
-    </div>
+    <?= search_actions($filtered, 'books/index.php') ?>
 </form>
 
 <div class="list-head">
-    <p><?= $pages['total'] ?> <?= $pages['total'] === 1 ? 'book' : 'books' ?><?= $filtered ? ($pages['total'] === 1 ? ' matches' : ' match') . ' these filters' : ' in the catalogue' ?>.</p>
+    <p><?= list_count($pages['total'], 'book', 'books', $filtered, ' in the catalogue') ?></p>
     <?php if ($books) : ?>
         <?= csv_link() ?>
     <?php endif; ?>
@@ -104,16 +93,14 @@ require __DIR__ . '/../includes/header.php';
                         <br><span class="pill pill--out"><?= $out ?> on loan</span>
                     <?php endif; ?>
                 </td>
-                <td>
-                    <a href="<?= e(url('books/edit.php?id=' . (int) $book['book_id'])) ?>">Edit</a>
-                    <?php if (is_admin()) : ?>
-                        <a href="<?= e(url('books/delete.php?id=' . (int) $book['book_id'])) ?>">Delete</a>
-                    <?php endif; ?>
+                <td class="row-actions">
+                    <?= edit_link('books', (int) $book['book_id']) ?>
+                    <?= delete_link('books', (int) $book['book_id']) ?>
                 </td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$books) : ?>
-            <tr><td colspan="6"><?= $filtered ? 'No books match these filters.' : 'No books yet. Add the first one.' ?></td></tr>
+            <?= empty_row(6, $filtered ? 'No books match these filters.' : 'No books yet. Add the first one.') ?>
         <?php endif; ?>
         </tbody>
     </table>

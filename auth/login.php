@@ -1,26 +1,20 @@
 <?php
 require_once __DIR__ . '/../includes/functions.php';
-
-if (!empty($_SESSION['user_id'])) {
-    redirect('dashboard/index.php');
-}
+require_once __DIR__ . '/../includes/auth_form.php';
+redirect_if_logged_in();
 
 $login = '';
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
-
-    // The field is called username, but an email works too. Usernames cannot contain @.
-    $login = strtolower(post_text('username'));
+    $login = strtolower(post_text('username')); // A username or an email.
     $password = post_password('password');
 
-    if ($login === '') {
-        $errors['username'] = 'Enter your username or email.';
-    }
-    if ($password === '') {
-        $errors['password'] = 'Enter your password.';
-    }
+    $errors = array_filter([
+        'username' => $login === '' ? 'Enter your username or email.' : null,
+        'password' => $password === '' ? 'Enter your password.' : null,
+    ]);
 
     if ($errors) {
         flash_now('error', 'Fill in both fields to log in.');
@@ -28,13 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         require_once __DIR__ . '/../config/database.php';
         require_once __DIR__ . '/../includes/mailer.php';
 
-        $stmt = $pdo->prepare(
-            'SELECT user_id, password_hash, email, email_verified_at, full_name, role FROM users WHERE username = ? OR email = ?'
-        );
-        $stmt->execute([$login, $login]);
-        $account = $stmt->fetch();
-
-        if ($account && password_verify($password, $account['password_hash'])) {
+        $account = find_user($pdo, $login);
+        if ($account !== null && password_verify($password, $account['password_hash'])) {
             if ($account['email_verified_at'] === null) {
                 // Right password, but the email is not confirmed yet: send a code and ask for it.
                 $_SESSION['verify_user_id'] = (int) $account['user_id'];
@@ -48,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('dashboard/index.php');
         }
 
-        // One message for an unknown account and a wrong password, so nobody can test which accounts exist.
+        // Same message for an unknown account and a wrong password, so nobody can test which accounts exist.
         $errors['password'] = 'Those details do not match an account.';
         flash_now('error', 'Those details do not match an account. Check your username or email, and your password.');
     }
@@ -74,20 +63,10 @@ require __DIR__ . '/../includes/header.php';
                     autocapitalize="none" spellcheck="false" required<?= $focus === 'username' ? ' autofocus' : '' ?><?= field_attrs($errors, 'username') ?>>
                 <?= field_error($errors, 'username') ?>
             </div>
-
-            <div class="field">
-                <div class="field__row">
-                    <label for="password">Password</label>
-                    <a class="field__link" href="<?= e(url('auth/forgot_password.php')) ?>">Forgot password?</a>
-                </div>
-                <div class="field__password">
-                    <input id="password" name="password" type="password" autocomplete="current-password"
-                        required<?= $focus === 'password' ? ' autofocus' : '' ?><?= field_attrs($errors, 'password') ?>>
-                    <button type="button" class="field__reveal" data-reveal="password" aria-pressed="false">Show</button>
-                </div>
-                <?= field_error($errors, 'password') ?>
-            </div>
-
+            <?= password_field($errors, 'password', 'Password', [
+                'autofocus' => $focus === 'password',
+                'link'      => '<a class="field__link" href="' . e(url('auth/forgot_password.php')) . '">Forgot password?</a>',
+            ]) ?>
             <button class="btn btn--block" type="submit" data-busy-label="Logging in…">Log in</button>
         </form>
 

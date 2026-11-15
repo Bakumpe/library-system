@@ -3,17 +3,15 @@ require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/reports.php';
 
-$late = days_late_sql();
-
-// Overdue: out on loan and past the due date. Most days late first, since those owe the most.
+// Overdue loans, most days late first since those owe the most.
 $overdue = $pdo->query(
-    "SELECT l.loan_id, l.due_date, $late AS days_late,
+    'SELECT l.loan_id, l.due_date, ' . DAYS_LATE_SQL . ' AS days_late,
             m.full_name, m.member_number, m.phone, b.title
      FROM loans l
      JOIN members m ON m.member_id = l.member_id
      JOIN books b ON b.book_id = l.book_id
-     WHERE l.date_returned IS NULL AND l.due_date < CURDATE()
-     ORDER BY days_late DESC, m.full_name"
+     WHERE ' . OVERDUE_SQL . '
+     ORDER BY days_late DESC, m.full_name'
 )->fetchAll();
 
 if (wants_csv()) {

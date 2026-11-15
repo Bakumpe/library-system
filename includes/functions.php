@@ -7,6 +7,29 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Anything a page didn't catch, like a database failure, is logged and the user gets a plain error page, never the SQL.
+set_exception_handler('show_error_page');
+
+function show_error_page(Throwable $error): void
+{
+    error_log('Unhandled ' . get_class($error) . ' in ' . $error->getFile() . ':' . $error->getLine() . ': ' . $error->getMessage());
+
+    $home = empty($_SESSION['user_id']) ? url('auth/login.php') : url('dashboard/index.php');
+    $box = '<section class="flash flash--error" role="alert"><p><strong>Something went wrong on our side.</strong></p>'
+        . '<p>Your last action may not have been saved. Check, then try again. If it keeps happening, tell the administrator the time it happened.</p>'
+        . '<p><a href="' . e($home) . '">Back to the library</a></p></section>';
+
+    if (headers_sent()) {
+        echo $box; // The page had started: finish it with the message.
+        return;
+    }
+    http_response_code(500);
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Something went wrong</title>'
+        . '<link rel="stylesheet" href="' . e(url('assets/css/style.css')) . '"></head>'
+        . '<body><main class="page">' . $box . '</main></body></html>';
+}
+
 /** Escape a value for HTML output. Use it on everything printed from the database or a form. */
 function e(mixed $value): string
 {
@@ -89,6 +112,37 @@ function field_attrs(array $errors, string $name): string
     return isset($errors[$name]) ? ' aria-invalid="true" aria-describedby="' . e($name) . '-error"' : '';
 }
 
+/** The toast over a form that has errors: "Fix the highlighted field to save the book." */
+function flash_form_errors(array $errors, string $goal): void
+{
+    $count = count($errors);
+    if ($count > 0) {
+        flash_now('error', ($count === 1 ? 'Fix the highlighted field' : "Fix the $count highlighted fields") . " to $goal.");
+    }
+}
+
+/**
+ * A form's starting values: the keys of $blank, filled from a database row when editing. Every value is text,
+ * the same as a posted form, so one set of fields shows both.
+ *
+ * @param array<string, string> $blank
+ * @return array<string, string>
+ */
+function form_values(array $blank, array $row = []): array
+{
+    $form = [];
+    foreach ($blank as $key => $default) {
+        $form[$key] = (string) ($row[$key] ?? $default);
+    }
+    return $form;
+}
+
+/** "1 book" or "3 books". */
+function plural(int $count, string $one, string $many): string
+{
+    return $count . ' ' . ($count === 1 ? $one : $many);
+}
+
 function csrf_token(): string
 {
     return $_SESSION['csrf_token'] ??= bin2hex(random_bytes(32));
@@ -115,6 +169,41 @@ function post_text(string $name): string
 {
     $value = $_POST[$name] ?? '';
     return is_string($value) ? trim($value) : '';
+}
+
+/** Read a text value from the address (?q=...) with the surrounding spaces removed. */
+function get_text(string $name): string
+{
+    $value = $_GET[$name] ?? '';
+    return is_string($value) ? trim($value) : '';
+}
+
+/** A key of $choices taken from the address, or '' when it is missing or not one of them. Use it for filters. */
+function get_choice(string $name, array $choices): string
+{
+    $value = get_text($name);
+    return isset($choices[$value]) ? $value : '';
+}
+
+/** A positive whole number from a POST field, such as a chosen member, or 0 when it is missing or not valid. */
+function post_id(string $name): int
+{
+    $id = filter_input(INPUT_POST, $name, FILTER_VALIDATE_INT);
+    return is_int($id) && $id > 0 ? $id : 0;
+}
+
+/**
+ * The id of the record an edit or delete page works on: ?id= when the page opens, the hidden id field when its
+ * form is sent. A missing or invalid id sends the user back to the list with $message.
+ */
+function require_id(string $back, string $message): int
+{
+    $id = filter_input($_SERVER['REQUEST_METHOD'] === 'POST' ? INPUT_POST : INPUT_GET, 'id', FILTER_VALIDATE_INT);
+    if (!is_int($id) || $id < 1) {
+        flash('error', $message);
+        redirect($back);
+    }
+    return $id;
 }
 
 /** Return an error message when a required value is empty or too long, otherwise null. */
@@ -148,8 +237,8 @@ function validate_username(string $value): ?string
         : 'Username must be 3 to 40 letters, numbers, dots, dashes or underscores, with no spaces.';
 }
 
-/** Return an error message when a new password is too short, too long or not confirmed, otherwise null. */
-function validate_new_password(string $password, string $confirm): ?string
+/** Return an error message when a new password is too short or too long, otherwise null. */
+function validate_new_password(string $password): ?string
 {
     if (strlen($password) < 8) {
         return 'Password must be at least 8 characters.';
@@ -158,10 +247,21 @@ function validate_new_password(string $password, string $confirm): ?string
     if (strlen($password) > 72) {
         return 'Password must be 72 characters or fewer.';
     }
-    if ($password !== $confirm) {
-        return 'The two passwords do not match.';
-    }
     return null;
+}
+
+/**
+ * Errors for a new password and its "type it again" box, keyed by their field names. Used by sign-up,
+ * reset password and change password.
+ *
+ * @return array<string, string>
+ */
+function new_password_errors(string $password, string $confirm, string $field, string $confirm_field): array
+{
+    return array_filter([
+        $field         => validate_new_password($password),
+        $confirm_field => $password !== $confirm ? 'The two passwords do not match.' : null,
+    ]);
 }
 
 /** Read a password field from POST exactly as typed (no trimming). */
@@ -180,6 +280,31 @@ function log_in(array $account): void
     $_SESSION['role']      = $account['role'];
 }
 
+/** The sign-in pages call this first: someone already logged in goes to $to instead. */
+function redirect_if_logged_in(string $to = 'dashboard/index.php'): void
+{
+    if (!empty($_SESSION['user_id'])) {
+        redirect($to);
+    }
+}
+
+/** One row from a prepared query, or null when nothing matches. $sql holds only ? placeholders. */
+function fetch_row(PDO $pdo, string $sql, array $params): ?array
+{
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $row = $stmt->fetch();
+    return $row === false ? null : $row;
+}
+
+/** Undo the open transaction, if there is one. Call it first in a catch block. */
+function rollback_if_open(PDO $pdo): void
+{
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+}
+
 /** True when a PDOException came from a UNIQUE constraint. */
 function is_duplicate_error(PDOException $e): bool
 {
@@ -192,29 +317,29 @@ function is_in_use_error(PDOException $e): bool
     return in_array($e->errorInfo[1] ?? null, [1451, 1452], true);
 }
 
-/**
- * Dropdown data for the book forms: [id => label], sorted by label.
- * Usage in books/create.php and books/edit.php:
- *   <select name="author_id" required><?= select_options(author_choices($pdo), $author_id, 'Choose an author') ?></select>
- */
+/** Authors for a dropdown: [id => name], sorted by name. Use with select_options(). */
 function author_choices(PDO $pdo): array
 {
     return $pdo->query('SELECT author_id, name FROM authors ORDER BY name')->fetchAll(PDO::FETCH_KEY_PAIR);
 }
 
-/** Same as author_choices(), for categories. */
+/** Categories for a dropdown, like author_choices(). */
 function category_choices(PDO $pdo): array
 {
     return $pdo->query('SELECT category_id, name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_KEY_PAIR);
 }
 
-/** Print <option> tags for a select, marking $selected. $placeholder adds an empty first option. */
-function select_options(array $choices, int|string|null $selected = null, ?string $placeholder = null): string
+/**
+ * Print <option> tags for a select, marking $selected. $placeholder adds an empty first option.
+ * Values listed in $disabled show but cannot be picked, like a suspended member on the issue page.
+ */
+function select_options(array $choices, int|string|null $selected = null, ?string $placeholder = null, array $disabled = []): string
 {
     $html = $placeholder !== null ? '<option value="">' . e($placeholder) . '</option>' : '';
     foreach ($choices as $value => $label) {
         $is_selected = $selected !== null && (string) $selected === (string) $value;
-        $html .= '<option value="' . e($value) . '"' . ($is_selected ? ' selected' : '') . '>' . e($label) . '</option>';
+        $html .= '<option value="' . e($value) . '"' . ($is_selected ? ' selected' : '')
+            . (in_array($value, $disabled, true) ? ' disabled' : '') . '>' . e($label) . '</option>';
     }
     return $html;
 }
@@ -231,14 +356,29 @@ function is_admin(): bool
     return ($_SESSION['role'] ?? '') === 'admin';
 }
 
-/**
- * Admin-only pages call this after auth_check.php. A librarian is sent back to $back with a message.
- * Librarians run the desk: add and edit records, issue and return, suspend. Deleting records is for admins.
- */
+/** Admin-only pages call this after auth_check.php. Librarians can do everything except delete. */
 function require_admin(string $back): void
 {
     if (!is_admin()) {
-        flash('error', 'Only an admin can delete records. Ask an admin, or suspend the member instead.');
+        flash('error', 'Only an admin can delete records. Ask an admin to do it.');
         redirect($back);
     }
+}
+
+/** A table row that spans every column, for "nothing found" messages. */
+function empty_row(int $columns, string $message): string
+{
+    return '<tr><td colspan="' . $columns . '">' . e($message) . '</td></tr>';
+}
+
+/** The Edit link for one row of a list, like edit_link('books', 7). */
+function edit_link(string $section, int $id): string
+{
+    return '<a href="' . e(url("$section/edit.php?id=$id")) . '">Edit</a>';
+}
+
+/** The Delete link for one row of a list. Only admins see it; delete pages also refuse everyone else. */
+function delete_link(string $section, int $id): string
+{
+    return is_admin() ? '<a href="' . e(url("$section/delete.php?id=$id")) . '">Delete</a>' : '';
 }
